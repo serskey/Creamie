@@ -30,6 +30,7 @@ enum DogBreed: String, CaseIterable {
     case chowChow = "Chow Chow"
     case cocker = "Cocker Spaniel"
     case collie = "Rough Collie"
+    case cockapoo = "Cockapoo"
     case corgi = "Welsh Corgi"
     case dachshund = "Dachshund"
     case dalmatian = "Dalmatian"
@@ -83,7 +84,6 @@ enum DogBreed: String, CaseIterable {
     case weimaraner = "Weimaraner"
     case whippet = "Whippet"
     case yorkie = "Yorkshire Terrier"
-    case cockapoo = "Cockapoo"
     
     var markerColor: Color {
         switch self {

@@ -7,9 +7,16 @@ struct Dog: Identifiable, Hashable {
     let name: String
     let breed: DogBreed
     let age: Int
-    let interests: [String]
+    let interests: [String]?
     let location: CLLocationCoordinate2D
-    let photo: String  // Name of the image asset
+    let photos: [String]  // Names of the image assets or saved photos
+    let aboutMe: String?
+    let ownerName: String?  // Name of the dog's owner
+    
+    // Convenience property for backward compatibility
+    var photo: String {
+        return photos.first ?? "dog_Sample"
+    }
     
     static func == (lhs: Dog, rhs: Dog) -> Bool {
         lhs.id == rhs.id
@@ -18,6 +25,28 @@ struct Dog: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
+    
+    init(
+            id: UUID,
+            name: String,
+            breed: DogBreed,
+            age: Int,
+            interests: [String]? = nil,
+            location: CLLocationCoordinate2D,
+            photos: [String],
+            aboutMe: String? = nil,
+            ownerName: String? = nil
+        ) {
+            self.id = id
+            self.name = name
+            self.breed = breed
+            self.age = age
+            self.interests = interests
+            self.location = location
+            self.photos = photos
+            self.aboutMe = aboutMe
+            self.ownerName = ownerName
+        }
 }
 
 // MARK: - Sample Data
@@ -27,28 +56,31 @@ extension Dog {
         [
             Dog(id: UUID(), name: "Max", breed: .labrador, age: 3, 
                 interests: ["Swimming", "Tennis Balls", "Hiking"],
-                location: CLLocationCoordinate2D(latitude: 34.0522, longitude: -118.2437),
-                photo: "dog_Max"),
+                location: CLLocationCoordinate2D(latitude: 37.7859, longitude: -122.4006),
+                photos: ["dog_Max"],
+                ownerName: "Sarah Johnson"),
             
             Dog(id: UUID(), name: "Creamie", breed: .cockapoo, age: 2,
                 interests: ["Running", "Snow", "Howling"],
-                location: CLLocationCoordinate2D(latitude: 34.0548, longitude: -118.2453),
-                photo: "dog_Creamie"),
+                location: CLLocationCoordinate2D(latitude: 37.7861, longitude: -122.4013),
+                photos: ["dog_Creamie", "dog_Creamie2"],
+                aboutMe: "I am Creamie!",
+                ownerName: "John Doe"),
             
-//            Dog(id: UUID(), name: "Bella", breed: .goldenRetriever, age: 4,
-//                interests: ["Frisbee", "Beach", "Cuddles"],
-//                location: CLLocationCoordinate2D(latitude: 34.0530, longitude: -118.2490),
-//                photo: "dog_golden"),
-//            
+            Dog(id: UUID(), name: "Bella", breed: .goldenRetriever, age: 4,
+                location: CLLocationCoordinate2D(latitude: 37.9861, longitude: -122.4020),
+                photos: ["dog_Sample"],
+                ownerName: "Emily Chen"),
+//
 //            Dog(id: UUID(), name: "Charlie", breed: .frenchBulldog, age: 1,
 //                interests: ["Naps", "Treats", "Short Walks"],
 //                location: CLLocationCoordinate2D(latitude: 34.0505, longitude: -118.2428),
-//                photo: "dog_frenchie"),
+//                photos: ["dog_frenchie"]),
 //            
 //            Dog(id: UUID(), name: "Daisy", breed: .corgi, age: 2,
 //                interests: ["Belly Rubs", "Agility", "Herding"],
 //                location: CLLocationCoordinate2D(latitude: 34.0555, longitude: -118.2420),
-//                photo: "dog_corgi")
+//                photos: ["dog_corgi"])
         ]
     }
 } 
