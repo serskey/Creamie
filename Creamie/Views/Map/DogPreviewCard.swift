@@ -72,7 +72,7 @@ struct DogPreviewCard: View {
                 // dog location
                 HStack(spacing: 12) {
                     Button(action: {
-                        let coordinates = dog.location
+                        let coordinates = dog.location.coordinate
                         let url = URL(string: "maps://?saddr=&daddr=\(coordinates.latitude),\(coordinates.longitude)")
                         if let url = url, UIApplication.shared.canOpenURL(url) {
                             UIApplication.shared.open(url)

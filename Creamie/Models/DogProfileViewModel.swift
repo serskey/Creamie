@@ -35,7 +35,7 @@ class DogProfileViewModel: ObservableObject {
         }
     }
     
-    func addDog(name: String, breed: DogBreed, age: Int, interests: [String] = [], location: CLLocationCoordinate2D, photos: [UIImage]?) {
+    func addDog(name: String, breed: DogBreed, age: Int, interests: [String] = [], location: Location, photos: [UIImage]?) {
         // Generate photo names or use default
         var photoNames: [String] = []
         

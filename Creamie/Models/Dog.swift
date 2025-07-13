@@ -2,13 +2,22 @@ import Foundation
 import CoreLocation
 import SwiftUI
 
-struct Dog: Identifiable, Hashable {
+struct Location: Codable, Hashable {
+    let latitude: Double
+    let longitude: Double
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
+struct Dog: Identifiable, Hashable, Codable {
     let id: UUID
     let name: String
     let breed: DogBreed
     let age: Int
     let interests: [String]?
-    let location: CLLocationCoordinate2D
+    let location: Location
     let photos: [String]  // Names of the image assets or saved photos
     let aboutMe: String?
     let ownerName: String?  // Name of the dog's owner
@@ -32,7 +41,7 @@ struct Dog: Identifiable, Hashable {
             breed: DogBreed,
             age: Int,
             interests: [String]? = nil,
-            location: CLLocationCoordinate2D,
+            location: Location,
             photos: [String],
             aboutMe: String? = nil,
             ownerName: String? = nil
@@ -56,19 +65,19 @@ extension Dog {
         [
             Dog(id: UUID(), name: "Max", breed: .labrador, age: 3, 
                 interests: ["Swimming", "Tennis Balls", "Hiking"],
-                location: CLLocationCoordinate2D(latitude: 37.7859, longitude: -122.4006),
+                location: Location(latitude: 37.7859, longitude: -122.4006),
                 photos: ["dog_Max"],
                 ownerName: "Sarah Johnson"),
             
             Dog(id: UUID(), name: "Creamie", breed: .cockapoo, age: 2,
                 interests: ["Running", "Snow", "Howling"],
-                location: CLLocationCoordinate2D(latitude: 37.7861, longitude: -122.4013),
+                location: Location(latitude: 37.7861, longitude: -122.4013),
                 photos: ["dog_Creamie", "dog_Creamie2"],
                 aboutMe: "I am Creamie!",
                 ownerName: "John Doe"),
             
             Dog(id: UUID(), name: "Bella", breed: .goldenRetriever, age: 4,
-                location: CLLocationCoordinate2D(latitude: 37.9861, longitude: -122.4020),
+                location: Location(latitude: 37.9861, longitude: -122.4020),
                 photos: ["dog_Sample"],
                 ownerName: "Emily Chen"),
 //

@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum DogBreed: String, CaseIterable {
+enum DogBreed: String, CaseIterable, Codable {
     case afghanHound = "Afghan Hound"
     case airdaleTerrier = "Airedale Terrier"
     case akita = "Akita"

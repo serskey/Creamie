@@ -1,140 +1,39 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
 struct MapView: View {
-    // Binding to track current tab selection
+    // MARK: - Bindings
     @Binding var selectedTab: Int
     @Binding var selectedChatId: UUID?
     
+    // MARK: - Environment & Services
     @EnvironmentObject private var locationManager: LocationManager
+    @StateObject private var viewModel = MapViewModel()
+    
+    // MARK: - UI State
     @State private var position: MapCameraPosition = .automatic
-    @State private var searchText = ""
     @State private var selectedDog: Dog?
     @State private var showingFilters = false
     @State private var selectedBreeds: Set<DogBreed> = Set(DogBreed.popularBreeds)
-    @State private var locationSearchResults: [MKMapItem] = []
-    @State private var route: MKRoute?
     @State private var isTrackingUserLocation = true
     
-
-    // Filters the dogs from sample dog pool based on the selected breeds
-    var filteredDogs: [Dog] {
-        Dog.sampleDogs.filter { selectedBreeds.contains($0.breed) }
+    // MARK: - Computed Properties
+    private var hasLocationPermission: Bool {
+        locationManager.authorizationStatus == .authorizedWhenInUse ||
+        locationManager.authorizationStatus == .authorizedAlways
     }
     
+    private var filteredDogs: [Dog] {
+        viewModel.nearbyDogs.filter { selectedBreeds.contains($0.breed) }
+    }
+    
+    // MARK: - Body
     var body: some View {
         ZStack {
-                // Show map only if we have permission
-                if locationManager.authorizationStatus == .authorizedWhenInUse ||
-                   locationManager.authorizationStatus == .authorizedAlways {
-                    Map(position: $position, selection: $selectedDog) {
-                        // Shows user's current location
-                        if let userLocation = locationManager.userLocation {
-                            Annotation("You", coordinate: userLocation.coordinate) {
-                                UserLocationMarker()
-                            }
-                        }
-                        
-                        ForEach(filteredDogs) { dog in
-                            Annotation(dog.name, coordinate: dog.location) {
-                                DogMarker(dog: dog)
-                            }
-                            .tag(dog)
-                        }
-                        
-                        if let route {
-                            MapPolyline(route)
-                                .stroke(.blue, lineWidth: 3)
-                        }
-                    }
-                    .mapStyle(.standard)
-                    .mapControlVisibility(.hidden)
-                    .onAppear {
-                        // Set position to user location when map appears
-                        position = .userLocation(fallback: .automatic)
-                        isTrackingUserLocation = true
-                    }
-                    .gesture(
-                        // Detect when user manually interacts with map
-                        DragGesture(minimumDistance: 3)
-                            .onChanged { _ in
-                                isTrackingUserLocation = false
-                            }
-                    )
-                } else if locationManager.authorizationStatus == .notDetermined {
-                    // Waiting for user to grant permission
-                    VStack(spacing: 20) {
-                        Image(systemName: "location.circle")
-                            .font(.system(size: 60))
-                            .foregroundColor(.blue)
-                        
-                        Text("Location Access Required")
-                            .font(.title)
-                            .fontWeight(.bold)
-                        
-                        Text("Creamie needs your location to show dogs near you")
-                            .multilineTextAlignment(.center)
-                            .padding()
-                        
-                        Button("Enable Location Access") {
-                            locationManager.requestPermission()
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
-                } else {
-                    // Permission denied
-                    VStack(spacing: 20) {
-                        Image(systemName: "location.slash.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.red)
-                        
-                        Text("Location Access Denied")
-                            .font(.title)
-                            .fontWeight(.bold)
-                        
-                        Text("Please enable location access in Settings to see nearby dogs.")
-                            .multilineTextAlignment(.center)
-                            .padding()
-                        
-                        Button("Open Settings") {
-                            if let url = URL(string: UIApplication.openSettingsURLString) {
-                                UIApplication.shared.open(url)
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
-                }
-                
-                VStack {
-                    // search bar, filter button, and location button on the top
-                    HStack {
-                        searchAndFilterBar
-                        
-                        Spacer()
-                        
-                        if locationManager.authorizationStatus == .authorizedWhenInUse ||
-                           locationManager.authorizationStatus == .authorizedAlways {
-                            // My Location Button in the top right corner
-                            CircularButton(
-                                icon: "location.fill",
-                                size: 50,
-                                isSelected: isTrackingUserLocation,
-                                action: {
-                                    withAnimation {
-                                        position = .userLocation(fallback: .automatic)
-                                        isTrackingUserLocation = true
-                                    }
-                                }
-                            )
-                            .padding(.trailing, 16)
-                        }
-                    }
-                    
-                    Spacer()
-                }
-            }
+            mapContent
+            mapOverlay
+        }
         .sheet(isPresented: $showingFilters) {
             FilterView(selectedBreeds: $selectedBreeds)
                 .presentationDetents([.medium])
@@ -144,36 +43,307 @@ struct MapView: View {
                 .presentationDetents([.medium])
                 .presentationBackgroundInteraction(.enabled)
         }
+        .onAppear {
+            setupInitialState()
+        }
+        .onChange(of: locationManager.userLocation) { _, newLocation in
+            handleLocationChange(newLocation)
+        }
+    }
+}
+
+// MARK: - Map Content
+private extension MapView {
+    @ViewBuilder
+    var mapContent: some View {
+        if hasLocationPermission {
+            mapWithAnnotations
+        } else if locationManager.authorizationStatus == .notDetermined {
+            LocationPermissionRequestView()
+        } else {
+            LocationPermissionDeniedView()
+        }
     }
     
-    private var searchAndFilterBar: some View {
-        HStack {
-            // Search Location
-            HStack {
-                Image("magnifyingglass")
-                
-                TextField("Search location", text: $searchText)
-                    .autocorrectionDisabled()
-                    .foregroundStyle(.primary)
+    var mapWithAnnotations: some View {
+        Map(position: $position, selection: $selectedDog) {
+            // User location marker
+            if let userLocation = locationManager.userLocation {
+                Annotation("You", coordinate: userLocation.coordinate) {
+                    UserLocationMarker()
+                }
             }
-            .padding(8)
-            .background{Color.clear}
-            .glassEffect(.clear.tint(Color.clear).interactive())
-            .clipShape(RoundedRectangle(cornerRadius: 16))
             
-            CircularButton(
-                icon: "line.3.horizontal.decrease.circle.fill",
-                size: 50,
-                isSelected: showingFilters,
-                action: { showingFilters.toggle() }
+            // Dog markers
+            ForEach(filteredDogs) { dog in
+                Annotation(dog.name, coordinate: dog.location.coordinate) {
+                    DogMarker(dog: dog)
+                }
+                .tag(dog)
+            }
+        }
+        .mapStyle(.standard)
+        .mapControlVisibility(.hidden)
+        .onMapCameraChange { context in
+            handleCameraChange(context)
+        }
+        .gesture(mapInteractionGesture)
+    }
+    
+    var mapInteractionGesture: some Gesture {
+        DragGesture()
+            .onChanged { _ in
+                isTrackingUserLocation = false
+            }
+            .onEnded { _ in
+                viewModel.debouncedFetchDogs()
+            }
+            .simultaneously(with:
+                MagnificationGesture()
+                    .onChanged { _ in
+                        isTrackingUserLocation = false
+                    }
+                    .onEnded { _ in
+                        viewModel.debouncedFetchDogs()
+                    }
             )
+    }
+}
 
+// MARK: - Map Overlay
+private extension MapView {
+    var mapOverlay: some View {
+        VStack {
+            topControls
+            Spacer()
+        }
+    }
+    
+    var topControls: some View {
+        HStack {
+            searchAndFilterBar
+            Spacer()
+            
+            if hasLocationPermission {
+                myLocationButton
+            }
+        }
+    }
+    
+    var searchAndFilterBar: some View {
+        HStack {
+            filterButton
         }
         .padding(.leading, 16)
     }
     
-    private func calculateRoute(to coordinate: CLLocationCoordinate2D) {
-        // Implementation for calculating route
-        // This would use MKDirections to get route from user location to dog
+    var filterButton: some View {
+        CircularButton(
+            icon: "line.3.horizontal.decrease.circle.fill",
+            size: 50,
+            isSelected: showingFilters,
+            action: { showingFilters.toggle() }
+        )
+    }
+    
+    var myLocationButton: some View {
+        CircularButton(
+            icon: "location.fill",
+            size: 50,
+            isSelected: isTrackingUserLocation,
+            action: centerOnUserLocation
+        )
+        .padding(.trailing, 16)
+    }
+}
+
+// MARK: - Actions
+private extension MapView {
+    func setupInitialState() {
+        guard let userLocation = locationManager.userLocation else { return }
+        
+        position = .userLocation(fallback: .automatic)
+        isTrackingUserLocation = true
+        viewModel.setInitialRegion(center: userLocation.coordinate)
+        viewModel.fetchNearbyDogs()
+    }
+    
+    func handleLocationChange(_ newLocation: CLLocation?) {
+        guard let _ = newLocation,
+              viewModel.isInitialLoad else { return }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            viewModel.fetchNearbyDogs()
+        }
+    }
+    
+    func handleCameraChange(_ context: MapCameraUpdateContext) {
+        viewModel.updateVisibleRegion(context.region)
+        
+        if !isTrackingUserLocation {
+            position = .region(context.region)
+        }
+        
+        viewModel.debouncedFetchDogs()
+    }
+    
+    func centerOnUserLocation() {
+        withAnimation {
+            position = .userLocation(fallback: .automatic)
+            isTrackingUserLocation = true
+        }
+    }
+}
+
+// MARK: - Location Permission Views
+struct LocationPermissionRequestView: View {
+    @EnvironmentObject private var locationManager: LocationManager
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "location.circle")
+                .font(.system(size: 60))
+                .foregroundColor(.blue)
+            
+            Text("Location Access Required")
+                .font(.title)
+                .fontWeight(.bold)
+            
+            Text("Creamie needs your location to show dogs near you")
+                .multilineTextAlignment(.center)
+                .padding()
+            
+            Button("Enable Location Access") {
+                locationManager.requestPermission()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
+    }
+}
+
+struct LocationPermissionDeniedView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "location.slash.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.red)
+            
+            Text("Location Access Denied")
+                .font(.title)
+                .fontWeight(.bold)
+            
+            Text("Please enable location access in Settings to see nearby dogs.")
+                .multilineTextAlignment(.center)
+                .padding()
+            
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
+    }
+}
+
+// MARK: - Map ViewModel
+@MainActor
+class MapViewModel: ObservableObject {
+    @Published var nearbyDogs: [Dog] = []
+    
+    private let locationService = DogLocationService.shared
+    private var lastFetchedRegion: MKCoordinateRegion?
+    private var currentVisibleRegion: MKCoordinateRegion?
+    private var fetchTimer: Timer?
+    
+    private(set) var isInitialLoad = true
+    
+    // MARK: - Constants
+    private enum Constants {
+        static let defaultSpan = MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+        static let fetchThresholdDistance: Double = 1000 // meters
+        static let fetchThresholdSpan: Double = 0.01
+        static let debounceDelay: TimeInterval = 0.5
+    }
+    
+    func setInitialRegion(center: CLLocationCoordinate2D) {
+        currentVisibleRegion = MKCoordinateRegion(center: center, span: Constants.defaultSpan)
+    }
+    
+    func updateVisibleRegion(_ region: MKCoordinateRegion) {
+        currentVisibleRegion = region
+    }
+    
+    func fetchNearbyDogs() {
+        guard let region = getCurrentVisibleRegion(),
+              shouldFetchForRegion(region) else { return }
+        
+        let boundingBox = createBoundingBox(from: region)
+        
+        Task {
+            do {
+                let response = try await locationService.fetchNearbyDogs(request: boundingBox)
+                
+                await MainActor.run {
+                    self.nearbyDogs = response.dogs
+                    self.lastFetchedRegion = region
+                    self.isInitialLoad = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.nearbyDogs = []
+                }
+            }
+        }
+    }
+    
+    func debouncedFetchDogs() {
+        fetchTimer?.invalidate()
+        fetchTimer = Timer.scheduledTimer(withTimeInterval: Constants.debounceDelay, repeats: false) { _ in
+            Task { @MainActor in
+                self.fetchNearbyDogs()
+            }
+        }
+    }
+    
+    deinit {
+        fetchTimer?.invalidate()
+    }
+}
+
+// MARK: - MapViewModel Private Methods
+private extension MapViewModel {
+    func getCurrentVisibleRegion() -> MKCoordinateRegion? {
+        return currentVisibleRegion
+    }
+    
+    func shouldFetchForRegion(_ region: MKCoordinateRegion) -> Bool {
+        guard !isInitialLoad else { return true }
+        guard let lastRegion = lastFetchedRegion else { return true }
+        
+        let distance = distanceBetweenRegions(region, lastRegion)
+        let spanDifference = abs(region.span.latitudeDelta - lastRegion.span.latitudeDelta)
+        
+        return distance > Constants.fetchThresholdDistance || spanDifference > Constants.fetchThresholdSpan
+    }
+    
+    func createBoundingBox(from region: MKCoordinateRegion) -> NearbyDogsRequest {
+        let center = region.center
+        let span = region.span
+        
+        return NearbyDogsRequest(
+            northEastLat: center.latitude + span.latitudeDelta / 2,
+            northEastLon: center.longitude + span.longitudeDelta / 2,
+            southWestLat: center.latitude - span.latitudeDelta / 2,
+            southWestLon: center.longitude - span.longitudeDelta / 2
+        )
+    }
+    
+    func distanceBetweenRegions(_ region1: MKCoordinateRegion, _ region2: MKCoordinateRegion) -> Double {
+        let location1 = CLLocation(latitude: region1.center.latitude, longitude: region1.center.longitude)
+        let location2 = CLLocation(latitude: region2.center.latitude, longitude: region2.center.longitude)
+        return location1.distance(from: location2)
     }
 }

@@ -23,7 +23,7 @@ struct AddDogView: View {
     private let maxPhotos = 5
     
     // TODO: Default location (Los Angeles area) - in a real app, you might use user's location
-    @State private var location = CLLocationCoordinate2D(latitude: 34.0522, longitude: -118.2437)
+    @State private var location = Location(latitude: 34.0522, longitude: -118.2437)
     
     private var isFormValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
