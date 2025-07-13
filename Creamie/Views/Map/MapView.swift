@@ -23,7 +23,7 @@ struct MapView: View {
         locationManager.authorizationStatus == .authorizedWhenInUse ||
         locationManager.authorizationStatus == .authorizedAlways
     }
-    
+
     private var filteredDogs: [Dog] {
         viewModel.nearbyDogs.filter { selectedBreeds.contains($0.breed) }
     }
@@ -66,24 +66,24 @@ private extension MapView {
     }
     
     var mapWithAnnotations: some View {
-        Map(position: $position, selection: $selectedDog) {
+                    Map(position: $position, selection: $selectedDog) {
             // User location marker
-            if let userLocation = locationManager.userLocation {
-                Annotation("You", coordinate: userLocation.coordinate) {
-                    UserLocationMarker()
-                }
-            }
-            
+                        if let userLocation = locationManager.userLocation {
+                            Annotation("You", coordinate: userLocation.coordinate) {
+                                UserLocationMarker()
+                            }
+                        }
+                        
             // Dog markers
-            ForEach(filteredDogs) { dog in
+                        ForEach(filteredDogs) { dog in
                 Annotation(dog.name, coordinate: dog.location.coordinate) {
-                    DogMarker(dog: dog)
-                }
-                .tag(dog)
-            }
-        }
-        .mapStyle(.standard)
-        .mapControlVisibility(.hidden)
+                                DogMarker(dog: dog)
+                            }
+                            .tag(dog)
+                        }
+                    }
+                    .mapStyle(.standard)
+                    .mapControlVisibility(.hidden)
         .onMapCameraChange { context in
             handleCameraChange(context)
         }
@@ -100,9 +100,9 @@ private extension MapView {
             }
             .simultaneously(with:
                 MagnificationGesture()
-                    .onChanged { _ in
-                        isTrackingUserLocation = false
-                    }
+                            .onChanged { _ in
+                                isTrackingUserLocation = false
+                            }
                     .onEnded { _ in
                         viewModel.debouncedFetchDogs()
                     }
@@ -180,6 +180,23 @@ private extension MapView {
     func handleCameraChange(_ context: MapCameraUpdateContext) {
         viewModel.updateVisibleRegion(context.region)
         
+        // Check if user has moved away from their location
+        if isTrackingUserLocation {
+            if let userLocation = locationManager.userLocation {
+                let userCoordinate = userLocation.coordinate
+                let currentCenter = context.region.center
+                
+                // Calculate distance between current center and user location
+                let distance = CLLocation(latitude: currentCenter.latitude, longitude: currentCenter.longitude)
+                    .distance(from: CLLocation(latitude: userCoordinate.latitude, longitude: userCoordinate.longitude))
+                
+                // If moved more than 100 meters away, stop tracking
+                if distance > 100 {
+                    isTrackingUserLocation = false
+                }
+            }
+        }
+        
         if !isTrackingUserLocation {
             position = .region(context.region)
         }
@@ -200,52 +217,52 @@ struct LocationPermissionRequestView: View {
     @EnvironmentObject private var locationManager: LocationManager
     
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "location.circle")
-                .font(.system(size: 60))
-                .foregroundColor(.blue)
-            
-            Text("Location Access Required")
-                .font(.title)
-                .fontWeight(.bold)
-            
-            Text("Creamie needs your location to show dogs near you")
-                .multilineTextAlignment(.center)
-                .padding()
-            
-            Button("Enable Location Access") {
-                locationManager.requestPermission()
-            }
-            .buttonStyle(.borderedProminent)
-        }
-        .padding()
+                    VStack(spacing: 20) {
+                        Image(systemName: "location.circle")
+                            .font(.system(size: 60))
+                            .foregroundColor(.blue)
+                        
+                        Text("Location Access Required")
+                            .font(.title)
+                            .fontWeight(.bold)
+                        
+                        Text("Creamie needs your location to show dogs near you")
+                            .multilineTextAlignment(.center)
+                            .padding()
+                        
+                        Button("Enable Location Access") {
+                            locationManager.requestPermission()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
     }
 }
 
 struct LocationPermissionDeniedView: View {
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "location.slash.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.red)
-            
-            Text("Location Access Denied")
-                .font(.title)
-                .fontWeight(.bold)
-            
-            Text("Please enable location access in Settings to see nearby dogs.")
-                .multilineTextAlignment(.center)
-                .padding()
-            
-            Button("Open Settings") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
+                    VStack(spacing: 20) {
+                        Image(systemName: "location.slash.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.red)
+                        
+                        Text("Location Access Denied")
+                            .font(.title)
+                            .fontWeight(.bold)
+                        
+                        Text("Please enable location access in Settings to see nearby dogs.")
+                            .multilineTextAlignment(.center)
+                            .padding()
+                        
+                        Button("Open Settings") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
                 }
-            }
-            .buttonStyle(.borderedProminent)
-        }
-        .padding()
-    }
 }
 
 // MARK: - Map ViewModel

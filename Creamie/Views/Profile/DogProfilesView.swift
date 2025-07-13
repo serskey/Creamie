@@ -62,10 +62,6 @@ struct DogProfilesView: View {
         ZStack {
             if let breedIconName = getBreedIconName(for: breed),
                let uiImage = UIImage(named: breedIconName) {
-//                // background color based on breed
-//                breed.markerColor
-//                    .opacity(0.1)
-//                    .ignoresSafeArea()
                 
                 Image(breedIconName)
                     .resizable()
