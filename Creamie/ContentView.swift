@@ -40,7 +40,7 @@ struct ContentView: View {
                     MapView(selectedTab: $selectedTab, selectedChatId: $selectedChatId)
                         .id(mapViewId)
                 case 1:
-                    DogProfileView()
+                    DogProfilesView()
                         .id(dogProfileViewId)
                 case 2:
                     MessagesView(chatViewModel: chatViewModel, selectedChatId: $selectedChatId)

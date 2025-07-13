@@ -1,0 +1,531 @@
+import SwiftUI
+import MapKit
+import UIKit
+import SwiftUIPager
+
+struct DogProfilesView: View {
+    @StateObject private var viewModel = DogProfileViewModel()
+    @State private var selectedDog: Dog?
+    @State private var isPhotoZoomed: Bool = false
+    @State private var showFullMap: Bool = false
+    @State private var currentDogIndex: Int = 0
+    
+    var body: some View {
+        ZStack {
+            // background cartoon icon based on breeds
+            if !viewModel.dogs.isEmpty && currentDogIndex < viewModel.dogs.count {
+                backgroundView(for: viewModel.dogs[currentDogIndex].breed)
+                    .animation(.easeInOut(duration: 0.5), value: currentDogIndex)
+            }
+            
+            // main content
+            if viewModel.isLoading {
+                loadingView
+            } else if viewModel.error != nil {
+                errorView
+            } else if viewModel.dogs.isEmpty {
+                emptyStateView
+            } else {
+                dogsCarouselView
+            }
+        }
+        .task {
+            await viewModel.fetchDogs()
+        }
+        .onChange(of: viewModel.dogs) { _, newDogs in
+            // Reset to first dog when dogs data changes
+            if !newDogs.isEmpty && currentDogIndex >= newDogs.count {
+                currentDogIndex = 0
+            }
+        }
+        .sheet(isPresented: $viewModel.showingAddDog) {
+            AddDogView(viewModel: viewModel)
+        }
+        .alert("Delete Dog?", isPresented: $viewModel.showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                if let dogToDelete = viewModel.dogToDelete {
+                    viewModel.deleteDog(dog: dogToDelete)
+                    if selectedDog?.id == dogToDelete.id {
+                        selectedDog = nil
+                    }
+                }
+            }
+        } message: {
+            if let dog = viewModel.dogToDelete {
+                Text("Are you sure you want to delete \(dog.name)? This action cannot be undone.")
+            }
+        }
+    }
+    
+    private func backgroundView(for breed: DogBreed) -> some View {
+        ZStack {
+            if let breedIconName = getBreedIconName(for: breed),
+               let uiImage = UIImage(named: breedIconName) {
+//                // background color based on breed
+//                breed.markerColor
+//                    .opacity(0.1)
+//                    .ignoresSafeArea()
+                
+                Image(breedIconName)
+                    .resizable()
+                    .scaledToFit()
+                    .ignoresSafeArea()
+                    .opacity(0.4)
+                
+            } else {
+                // fallback
+                Color.gray.opacity(0.1)
+                    .ignoresSafeArea()
+            }
+        }
+    }
+    
+    // TODO: Move to separate file
+    private func getBreedIconName(for breed: DogBreed) -> String? {
+        switch breed {
+        case .afghanHound:
+            return "afghanHound"
+        case .airdaleTerrier:
+            return "airdaleTerrier"
+        case .akita:
+            return "akita"
+        case .alaskanMalamute:
+            return "alaskanMalamute"
+        case .americanBulldog:
+            return "americanBulldog"
+        case .beagle:
+            return "beagle"
+        case .cockapoo:
+            return "cockapoo"
+        case .frenchBulldog:
+            return "frenchBulldog"
+        case .husky:
+            return "husky"
+        case .labrador:
+            return "labrador"
+        case .mastiff:
+            return "mastiff"
+        case .shihTzu:
+            return "shihTzu"
+        default:
+            return "cockapoo"
+        }
+    }
+    
+    private var loadingView: some View {
+        ZStack{
+            Image("cockapoo")
+                .resizable()
+                .scaledToFit()
+                .opacity(0.2)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                ProgressView("Loading your dogs...")
+            }
+            .padding(40)
+            .glassEffect(.clear.tint(Color.clear).interactive(false))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            
+        }
+    }
+    
+    private var errorView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 50))
+                .foregroundColor(.red)
+            
+            Text("Error loading dogs")
+                .font(.title2.bold())
+                .foregroundColor(.primary)
+            
+            Button("Try Again") {
+                Task {
+                    await viewModel.fetchDogs()
+                }
+            }
+            .padding()
+            .background(Color.blue.opacity(0.2))
+            .foregroundColor(.blue)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(40)
+        .background(Color.clear)
+        .glassEffect(.clear.tint(Color.clear).interactive())
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 30) {
+            Image(systemName: "dog.circle")
+                .font(.system(size: 80))
+                .foregroundColor(.primary.opacity(0.7))
+            
+            VStack(spacing: 12) {
+                Text("No Dogs Yet!")
+                    .font(.title.bold())
+                    .foregroundColor(.primary)
+                
+                Text("Add your first furry friend to get started with the liquid glass experience")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+            }
+            
+            Button(action: {
+                viewModel.showingAddDog = true
+            }) {
+                HStack(spacing: 12) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("Add Your First Dog")
+                }
+                .font(.headline)
+                .foregroundColor(.primary)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .background(Color.clear)
+                .glassEffect(.clear.tint(Color.clear).interactive())
+                .clipShape(RoundedRectangle(cornerRadius: 25))
+            }
+        }
+        .padding(40)
+        .background(Color.clear)
+        .glassEffect(.clear.tint(Color.clear).interactive())
+        .clipShape(RoundedRectangle(cornerRadius: 30))
+    }
+    
+    private var dogsCarouselView: some View {
+        ZStack {
+            // component 1: dog picker
+            VStack(spacing: 0) {
+                dogPickerView
+                    .padding(.top, 8)
+                Spacer()
+            }
+            
+            // component 2: main profile
+            TabView(selection: $currentDogIndex) {
+                ForEach(Array(viewModel.dogs.enumerated()), id: \.element.id) { index, dog in
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                ExpandedLiquidGlassDogCard(dog: dog)
+                                    .padding(.horizontal, 16)
+                                    .padding(.bottom, 140)
+                            }
+                        }
+                    }
+                    .onTapGesture {
+                        selectedDog = dog
+                    }
+                    .tag(index)
+                }
+            }
+            .padding(.top, 32)
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+            
+            // component 3
+            bottomToolbar
+        }
+        
+    }
+    
+    // component 1: dog picker
+    private var dogPickerView: some View {
+        Picker("Select Dog", selection: $currentDogIndex) {
+            ForEach(Array(viewModel.dogs.enumerated()), id: \.element.id) { index, dog in
+                HStack {
+                    Text(dog.name)
+                        .font(.headline)
+                }
+                .tag(index)
+            }
+        }
+        .pickerStyle(SegmentedPickerStyle())
+        .background(.clear)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 8)
+    }
+    
+    // component 2: main profile
+    private struct ExpandedLiquidGlassDogCard: View {
+        let dog: Dog
+        @State private var currentPage: Page = .first()
+        
+        var body: some View {
+            // dog photos
+            VStack(spacing: 16) {
+                if dog.photos.count > 1 {
+                    // SwiftUIPager
+                    VStack(spacing: 12) {
+                        Pager(page: currentPage,
+                              data: dog.photos,
+                              id: \.self) { photoName in
+                            DogPhotoView(photoName: photoName)
+                                .frame(height: 280)
+                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        }
+                        .interactive(rotation: true)
+                        .interactive(scale: 0.8)
+                        .itemSpacing(5)
+                        .itemAspectRatio(0.7, alignment: .center)
+                        .pageOffset(1.5)
+                        .frame(height: 280)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        
+                    }
+                } else if let firstPhoto = dog.photos.first {
+                    // Show the single photo normally
+                    DogPhotoView(photoName: firstPhoto)
+                        .frame(height: 280)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                } else {
+                    // fallback
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(height: 280)
+                        .overlay(
+                            VStack(spacing: 8) {
+                                Image(systemName: "photo")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.gray.opacity(0.7))
+                                Text("No photos yet")
+                                    .font(.caption)
+                                    .foregroundColor(.gray.opacity(0.7))
+                            }
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+                
+
+                // dog basic info
+                VStack(spacing: 16) {
+                    VStack(spacing: 12) {
+                        Text(dog.name)
+                            .font(.largeTitle.bold())
+                            .foregroundColor(.primary)
+                        
+                        Text("\(dog.breed.rawValue) · \(dog.age) years old")
+                            .font(.title2.bold())
+                            .foregroundColor(.primary)
+                    }
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 24)
+//                    .background(Color.clear)
+//                    .glassEffect(.clear.tint(Color.clear).interactive())
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    
+                    // dog interests
+                    if let interests = dog.interests, !interests.isEmpty {
+                        VStack(spacing: 12) {
+                            Text("Interests")
+                                .font(.title3.bold())
+                                .foregroundColor(.primary)
+                            
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 8) {
+                                ForEach(interests, id: \.self) { interest in
+                                    Text(interest)
+                                        .font(.body.bold())
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+//                                        .background(Color.clear)
+                                        .foregroundColor(.primary)
+//                                        .glassEffect(.clear.tint(Color.clear).interactive())
+                                        .clipShape(Capsule())
+                                }
+                            }
+                        }
+                        .padding(.vertical, 20)
+                        .padding(.horizontal, 24)
+//                        .background(Color.clear)
+//                        .glassEffect(.clear.tint(Color.clear).interactive())
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    
+                    // About Me
+                    if let aboutMe = dog.aboutMe, !aboutMe.isEmpty {
+                        VStack(spacing: 12) {
+                            Text("About Me")
+                                .font(.title3.bold())
+                                .foregroundColor(.primary)
+                            
+                            Text(aboutMe)
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(nil)
+                        }
+                        .padding(.vertical, 20)
+                        .padding(.horizontal, 24)
+//                        .background(Color.clear)
+//                        .glassEffect(.clear.tint(Color.clear).interactive())
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    
+                    // Health Conditions
+                    if let healthInfo = getHealthInfo(for: dog) {
+                        VStack(spacing: 12) {
+                            Text("Health & Care")
+                                .font(.title3.bold())
+                                .foregroundColor(.primary)
+                            
+                            VStack(spacing: 8) {
+                                ForEach(healthInfo, id: \.title) { info in
+                                    HStack {
+                                        Image(systemName: info.icon)
+                                            .foregroundColor(.green)
+                                            .frame(width: 20)
+                                        Text(info.title)
+                                            .font(.body)
+                                            .foregroundColor(.primary)
+                                        Spacer()
+                                        Text(info.value)
+                                            .font(.body)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 20)
+                        .padding(.horizontal, 24)
+//                        .background(Color.clear)
+//                        .glassEffect(.clear.tint(Color.clear).interactive())
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .padding(.vertical, 16)
+        }
+        
+        // Fetch Health Info
+        private func getHealthInfo(for dog: Dog) -> [HealthInfoItem]? {
+            return [
+                HealthInfoItem(icon: "heart.fill", title: "Weight", value: "\(Int.random(in: 15...35)) kg"),
+                HealthInfoItem(icon: "calendar", title: "Last Checkup", value: "2 weeks ago"),
+                HealthInfoItem(icon: "syringe", title: "Vaccinations", value: "Up to date"),
+                HealthInfoItem(icon: "scissors", title: "Last Grooming", value: "1 month ago")
+            ]
+        }
+    }
+    
+    // component 3
+    private var bottomToolbar: some View {
+        VStack {
+            Spacer()
+            
+            HStack {
+                leftActionsMenu
+                
+                Spacer()
+                
+                rightDeleteButton
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 100)
+        }
+    }
+    
+    private var leftActionsMenu: some View {
+        Menu {
+            Button {
+                viewModel.showingAddDog = true
+            } label: {
+                Label("Add Dog", systemImage: "plus.square")
+            }
+            
+            if !viewModel.dogs.isEmpty {
+                Button {
+                    if currentDogIndex < viewModel.dogs.count {
+                        selectedDog = viewModel.dogs[currentDogIndex]
+                    }
+                } label: {
+                    Label("Edit Dog", systemImage: "square.and.pencil")
+                }
+            }
+        } label: {
+            
+            Image(systemName: "list.bullet.below.rectangle")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(.primary)
+                .padding(14)
+                .glassEffect(.clear.tint(Color.clear).interactive())
+                .clipShape(Circle())
+        }
+    }
+    
+    private var rightDeleteButton: some View {
+        Button {
+            if !viewModel.dogs.isEmpty && currentDogIndex < viewModel.dogs.count {
+                viewModel.confirmDeleteDog(dog: viewModel.dogs[currentDogIndex])
+            }
+        } label: {
+            Image(systemName: "trash")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(.primary)
+                .padding(14)
+                .glassEffect(.clear.tint(Color.clear).interactive())
+                .clipShape(Circle())
+        }
+        .disabled(viewModel.dogs.isEmpty)
+    }
+    
+    private struct HealthInfoItem {
+        let icon: String
+        let title: String
+        let value: String
+    }
+    
+    private struct EmptyDogListView: View {
+        @ObservedObject var viewModel: DogProfileViewModel
+        
+        var body: some View {
+            VStack(spacing: 20) {
+                Image(systemName: "dog.circle")
+                    .font(.system(size: 80))
+                    .foregroundColor(.gray.opacity(0.6))
+                
+                VStack(spacing: 8) {
+                    Text("No Dogs Yet!")
+                        .font(.title2.bold())
+                        .foregroundColor(.primary)
+                    
+                    Text("Add your first furry friend to get started")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                Button(action: {
+                    viewModel.showingAddDog = true
+                }) {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add Your First Dog")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(Color.blue)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                
+                Button("Refresh") {
+                    Task {
+                        await viewModel.fetchDogs()
+                    }
+                }
+                .font(.subheadline)
+                .foregroundColor(.blue)
+            }
+            .padding()
+        }
+    }
+    
+}
+
