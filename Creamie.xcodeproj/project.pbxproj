@@ -37,17 +37,29 @@
 		0EFF5B772E1CBB0B004EFE84 /* Exceptions for "Creamie" folder in "Creamie" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				.gitignore,
 				Info.plist,
 			);
 			target = 0E9172992E1A344F001D0FF5 /* Creamie */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		0EA2B6CF2E26561F0093F4D9 /* Exceptions for "Creamie" folder in "Compile Sources" phase from "Creamie" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = 0E9172962E1A344F001D0FF5 /* Sources */;
+			membershipExceptions = (
+				.gitignore,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0E91729C2E1A3450001D0FF5 /* Creamie */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				0EFF5B772E1CBB0B004EFE84 /* Exceptions for "Creamie" folder in "Creamie" target */,
+				0EA2B6CF2E26561F0093F4D9 /* Exceptions for "Creamie" folder in "Compile Sources" phase from "Creamie" target */,
 			);
 			path = Creamie;
 			sourceTree = "<group>";

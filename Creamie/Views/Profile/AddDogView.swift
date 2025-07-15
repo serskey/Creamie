@@ -23,7 +23,7 @@ struct AddDogView: View {
     @State private var currentEditingIndex: Int? = nil
     
     // Generate a unique owner ID for each new dog
-    private let ownerId = UUID()
+    private let ownerId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
     
     // Maximum number of photos allowed
     private let maxPhotos = 5
@@ -75,15 +75,13 @@ struct AddDogView: View {
             Form {
                 Section(header: Text("Photos")) {
                     VStack(spacing: 16) {
-                        let photoCount = selectedImages.compactMap { $0 }.count
-                        
                         // Grid of photo upload blocks
                         LazyVGrid(columns: [
                             GridItem(.flexible()),
                             GridItem(.flexible()),
                             GridItem(.flexible())
                         ], spacing: 12) {
-                            ForEach(minPhotos..<maxPhotos, id: \.self) { index in
+                            ForEach(0..<maxPhotos, id: \.self) { index in
                                 PhotoUploadBlock(
                                     image: selectedImages[index],
                                     index: index,
@@ -202,8 +200,6 @@ struct AddDogView: View {
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {
-                        // TODO: toggle button to set dog's online status upon their choose,
-                        // mention they can change the status in setting as well, or add a button on the "My dog" page to easily toggle
                         saveDog()
                     }) {
                         Image(systemName: "checkmark")
@@ -245,6 +241,7 @@ struct AddDogView: View {
                 matching: .images
             )
         }
+
     }
     
     private func deletePhoto(at index: Int) {
@@ -276,10 +273,14 @@ struct AddDogView: View {
             age: age,
             interests: interests,
             location: currentLocation,
-            photos: validImages.isEmpty ? nil : validImages,
+            photos: validImages,
             aboutMe: aboutMe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : aboutMe.trimmingCharacters(in: .whitespacesAndNewlines),
             ownerName: ownerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : ownerName.trimmingCharacters(in: .whitespacesAndNewlines),
-            ownerId: ownerId
+            ownerId: ownerId,
+            // TODO: toggle button to set dog's online status upon their choose,
+            // mention they can change the status in setting as well, or add a button on the "My dog" page to easily toggle
+            // Hardcode to online for now
+            isOnline: true
         )
         dismiss()
     }

@@ -11,6 +11,8 @@ class DogProfileViewModel: ObservableObject {
     @Published var showingAddDog = false
     @Published var showingDeleteConfirmation = false
     @Published var dogToDelete: Dog?
+    @Published var addDogError: String?
+    @Published var addDogSuccess: String?
     
     private let dogProfileService = DogProfileService.shared
     
@@ -37,49 +39,25 @@ class DogProfileViewModel: ObservableObject {
         age: Int,
         interests: [String] = [],
         location: Location,
-        photos: [UIImage]?,
+        photos: [UIImage],
         aboutMe: String?,
         ownerName: String?,
-        ownerId: UUID
+        ownerId: UUID,
+        isOnline: Bool
     ) {
-        // Generate photo names or use default
+        // Generate unique photo names for each image (UI ensures >= 2 photos)
         var photoNames: [String] = []
         
-        if let dogPhotos = photos, !dogPhotos.isEmpty {
-            // Generate unique photo names for each image
-            for (index, photo) in dogPhotos.enumerated() {
-                let photoName = "dog_\(name.replacingOccurrences(of: " ", with: "_"))_\(photoCounter)_\(index)"
-                photoCounter += 1
-                
-                // Save photo to documents directory
-                saveImage(photo, withName: photoName)
-                photoNames.append(photoName)
-            }
-        } else {
-            // Use default photo
-            photoNames = ["dog_Creamie"]
+        for (index) in photos.enumerated() {
+            let photoName = "dog_\(name.replacingOccurrences(of: " ", with: "_"))_\(photoCounter)_\(index)"
+            photoCounter += 1
+        
+//             // TODO: Save to backend db
+//                saveImage(photo, withName: photoName)
+            photoNames.append(photoName)
         }
         
-        let newDog = Dog(
-            id: UUID(),
-            name: name,
-            breed: breed,
-            age: age,
-            interests: interests,
-            aboutMe: aboutMe,
-            photos: photoNames,
-            location: location,
-            ownerId: ownerId,
-            ownerName: ownerName,
-            isOnline: true,
-            updatedAt: Date.now,
-            createdAt: Date.now
-        )
-        
-        dogs.append(newDog)
-        showingAddDog = false
-        
-        // Save dog to backend database
+        // Save dog to backend database first
         Task {
             var response: AddDogResponse?
             do {
@@ -93,13 +71,39 @@ class DogProfileViewModel: ObservableObject {
                     aboutMe: aboutMe,
                     ownerName: ownerName,
                     ownerId: ownerId,
-                    isOnline: true
+                    isOnline: isOnline
                 )
                 
                 response = try await DogProfileService.shared.createDog(addDogRequest: addDogRequest)
                 print("Successfully saved dog to backend: \(String(describing: response?.dogId))")
+                
+                // Only add to local array if backend save succeeded
+                let newDog = Dog(
+                    id: UUID(),
+                    name: name,
+                    breed: breed,
+                    age: age,
+                    interests: interests,
+                    aboutMe: aboutMe,
+                    photos: photoNames,
+                    location: location,
+                    ownerId: ownerId,
+                    ownerName: ownerName,
+                    isOnline: isOnline,
+                    updatedAt: Date.now,
+                    createdAt: Date.now
+                )
+                
+                dogs.append(newDog)
+                showingAddDog = false
+                
+                // Show success message
+                self.addDogSuccess = "\(name) has been successfully added to your dogs!"
+                
             } catch {
                 print("Failed to save dog to backend: \(String(describing: response?.error))")
+                // Set specific error for add dog failures  
+                self.addDogError = "Unable to save \(name). Please check your internet connection and try again."
             }
         }
     }

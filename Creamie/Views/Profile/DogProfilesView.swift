@@ -59,6 +59,21 @@ struct DogProfilesView: View {
                 Text("Are you sure you want to delete \(dog.name)? This action cannot be undone.")
             }
         }
+        .alert("Error", isPresented: .constant(viewModel.addDogError != nil)) {
+            Button("OK") {
+                viewModel.addDogError = nil
+            }
+        } message: {
+            Text(viewModel.addDogError ?? "")
+        }
+        .alert("Success! 🎉", isPresented: .constant(viewModel.addDogSuccess != nil)) {
+            // TODO: After success, stay on the new dog page, right now it's on first dog page
+            Button("OK") {
+                viewModel.addDogSuccess = nil
+            }
+        } message: {
+            Text(viewModel.addDogSuccess ?? "")
+        }
     }
     
     private func backgroundView(for breed: DogBreed) -> some View {
