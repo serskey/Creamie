@@ -1,3 +1,5 @@
+// Not used for now
+
 import SwiftUI
 import MapKit
 

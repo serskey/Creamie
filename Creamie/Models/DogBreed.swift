@@ -141,7 +141,16 @@ enum DogBreed: String, CaseIterable, Codable {
         }
     }
     
+    var iconName: String {
+        String(describing: self)
+    }
+    
     static var popularBreeds: [DogBreed] {
         DogBreed.allCases
     }
-} 
+    
+    static var sortedBreeds: [DogBreed] {
+        DogBreed.allCases.sorted { $0.rawValue < $1.rawValue }
+    }
+    
+}

@@ -3,10 +3,6 @@ import SwiftUI
 struct FilterView: View {
     @Binding var selectedBreeds: Set<DogBreed>
     
-    private var sortedBreeds: [DogBreed] {
-        DogBreed.allCases.sorted { $0.rawValue < $1.rawValue }
-    }
-    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -32,7 +28,7 @@ struct FilterView: View {
                     Divider()
                         .padding(.vertical, 8)
                     
-                    ForEach(sortedBreeds, id: \.self) { breed in
+                    ForEach(DogBreed.sortedBreeds, id: \.self) { breed in
                         HStack {
                             Image(systemName: selectedBreeds.contains(breed) ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(selectedBreeds.contains(breed) ? .blue : .gray)

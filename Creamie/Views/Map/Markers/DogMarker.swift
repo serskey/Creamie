@@ -19,9 +19,8 @@ struct DogMarker: View {
                     .frame(width: 40, height: 40)
                 
                 Group {
-                    if let imageName = breedImageName(for: dog.breed),
-                       UIImage(named: imageName) != nil {
-                        Image(imageName)
+                    if let _ = UIImage(named: dog.breed.iconName) {
+                        Image(dog.breed.iconName)
                             .resizable()
                     } else {
                         Image(systemName: "pawprint.circle.fill")
@@ -37,38 +36,7 @@ struct DogMarker: View {
             
         }
     }
-    
-    // Map breed enum cases to actual folder names
-    private func breedImageName(for breed: DogBreed) -> String? {
-        switch breed {
-        case .afghanHound:
-            return "afghanHound"
-        case .airdaleTerrier:
-            return "airdaleTerrier"
-        case .akita:
-            return "akita"
-        case .alaskanMalamute:
-            return "alaskanMalamute"
-        case .americanBulldog:
-            return "americanBulldog"
-        case .beagle:
-            return "beagle"
-        case .frenchBulldog:
-            return "frenchBulldog"
-        case .mastiff:
-            return "mastiff"
-        case .shihTzu:
-            return "shihTzu"
-        case .husky:
-            return "husky"
-        case .cockapoo:
-            return "cockapoo"
-        case .labrador:
-            return "labrador"
-        default:
-            return nil // Use fallback paw print
-        }
-    }
+
     
 //    // Adjust image size based on breed to compensate for different padding in original images
 //    private func imageSizeForBreed(_ breed: DogBreed) -> CGFloat {

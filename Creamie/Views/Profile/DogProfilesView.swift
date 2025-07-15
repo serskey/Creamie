@@ -10,6 +10,8 @@ struct DogProfilesView: View {
     @State private var showFullMap: Bool = false
     @State private var currentDogIndex: Int = 0
     
+    private let locationService = DogLocationService.shared
+    
     var body: some View {
         ZStack {
             // background cartoon icon based on breeds
@@ -30,7 +32,8 @@ struct DogProfilesView: View {
             }
         }
         .task {
-            await viewModel.fetchDogs()
+            // TODO: change to real login user id
+            await viewModel.fetchUserDogs(userId: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!)
         }
         .onChange(of: viewModel.dogs) { _, newDogs in
             // Reset to first dog when dogs data changes
@@ -60,54 +63,19 @@ struct DogProfilesView: View {
     
     private func backgroundView(for breed: DogBreed) -> some View {
         ZStack {
-            if let breedIconName = getBreedIconName(for: breed),
-               let uiImage = UIImage(named: breedIconName) {
-                
-                Image(breedIconName)
+            if let _ = UIImage(named: breed.iconName) {
+                Image(breed.iconName)
                     .resizable()
                     .scaledToFit()
                     .ignoresSafeArea()
                     .opacity(0.4)
-                
             } else {
-                // fallback
                 Color.gray.opacity(0.1)
                     .ignoresSafeArea()
             }
         }
     }
-    
-    // TODO: Move to separate file
-    private func getBreedIconName(for breed: DogBreed) -> String? {
-        switch breed {
-        case .afghanHound:
-            return "afghanHound"
-        case .airdaleTerrier:
-            return "airdaleTerrier"
-        case .akita:
-            return "akita"
-        case .alaskanMalamute:
-            return "alaskanMalamute"
-        case .americanBulldog:
-            return "americanBulldog"
-        case .beagle:
-            return "beagle"
-        case .cockapoo:
-            return "cockapoo"
-        case .frenchBulldog:
-            return "frenchBulldog"
-        case .husky:
-            return "husky"
-        case .labrador:
-            return "labrador"
-        case .mastiff:
-            return "mastiff"
-        case .shihTzu:
-            return "shihTzu"
-        default:
-            return "cockapoo"
-        }
-    }
+
     
     private var loadingView: some View {
         ZStack{
@@ -139,7 +107,7 @@ struct DogProfilesView: View {
             
             Button("Try Again") {
                 Task {
-                    await viewModel.fetchDogs()
+                    await viewModel.fetchUserDogs(userId: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!)
                 }
             }
             .padding()
@@ -513,7 +481,7 @@ struct DogProfilesView: View {
                 
                 Button("Refresh") {
                     Task {
-                        await viewModel.fetchDogs()
+                        await viewModel.fetchUserDogs(userId: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!)
                     }
                 }
                 .font(.subheadline)

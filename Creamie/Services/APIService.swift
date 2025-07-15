@@ -53,7 +53,6 @@ class APIService {
     }
     
     // MARK: - Generic Request Methods
-    
     func request<T: Codable>(
         endpoint: String,
         method: HTTPMethod = .GET,

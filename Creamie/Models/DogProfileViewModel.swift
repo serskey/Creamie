@@ -12,30 +12,36 @@ class DogProfileViewModel: ObservableObject {
     @Published var showingDeleteConfirmation = false
     @Published var dogToDelete: Dog?
     
+    private let dogProfileService = DogProfileService.shared
+    
     // Photo storage
     private var photoCounter = 0
     
-    func fetchDogs() async {
-        isLoading = true
-        defer { isLoading = false }
+    func fetchUserDogs(userId: UUID) async {
+        let getUserDogsRequest = GetUserDogsRequest(userId: userId)
         
         do {
-            // TODO: Replace with actual API call
-            // Simulating network delay
-            try await Task.sleep(nanoseconds: 1_000_000_000)
-            dogs = Dog.sampleDogs
+            let response = try await dogProfileService.fetchUserDogs(getUserDogsRequest: getUserDogsRequest)
+            self.dogs = response.dogs
+            print("Fetched \(response.totalCount) dogs from user \(userId)")
         } catch {
-            self.error = error
+            // TODO: Add error detail from backend
+            print("Failed to fetch user's dogs")
+            self.dogs = []
         }
     }
     
-    func refreshDogs() {
-        Task {
-            await fetchDogs()
-        }
-    }
-    
-    func addDog(name: String, breed: DogBreed, age: Int, interests: [String] = [], location: Location, photos: [UIImage]?) {
+    func addDog(
+        name: String,
+        breed: DogBreed,
+        age: Int,
+        interests: [String] = [],
+        location: Location,
+        photos: [UIImage]?,
+        aboutMe: String?,
+        ownerName: String?,
+        ownerId: UUID
+    ) {
         // Generate photo names or use default
         var photoNames: [String] = []
         
@@ -60,17 +66,44 @@ class DogProfileViewModel: ObservableObject {
             breed: breed,
             age: age,
             interests: interests,
+            aboutMe: aboutMe,
+            photos: photoNames,
             location: location,
-            photos: photoNames
+            ownerId: ownerId,
+            ownerName: ownerName,
+            isOnline: true,
+            updatedAt: Date.now,
+            createdAt: Date.now
         )
         
         dogs.append(newDog)
         showingAddDog = false
         
-        // TODO: In a real app, you would save this to your backend/database
-        print("Added new dog: \(newDog.name) with \(photoNames.count) photos")
+        // Save dog to backend database
+        Task {
+            var response: AddDogResponse?
+            do {
+                let addDogRequest = AddDogRequest(
+                    name: name,
+                    breed: breed.rawValue,
+                    age: age,
+                    interests: interests,
+                    location: location,
+                    photos: photoNames,
+                    aboutMe: aboutMe,
+                    ownerName: ownerName,
+                    ownerId: ownerId,
+                    isOnline: true
+                )
+                
+                response = try await DogProfileService.shared.createDog(addDogRequest: addDogRequest)
+                print("Successfully saved dog to backend: \(String(describing: response?.dogId))")
+            } catch {
+                print("Failed to save dog to backend: \(String(describing: response?.error))")
+            }
+        }
     }
-    
+
     func deleteDog(at indexSet: IndexSet) {
         // Delete all photos for each dog being deleted
         for index in indexSet {
@@ -106,8 +139,6 @@ class DogProfileViewModel: ObservableObject {
         dogToDelete = dog
         showingDeleteConfirmation = true
     }
-    
-    // MARK: - Image Handling
     
     private func saveImage(_ image: UIImage, withName name: String) {
         guard let data = image.jpegData(compressionQuality: 0.7) else { return }

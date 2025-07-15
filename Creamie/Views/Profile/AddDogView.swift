@@ -5,12 +5,15 @@ import PhotosUI
 struct AddDogView: View {
     @ObservedObject var viewModel: DogProfileViewModel
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var locationManager: LocationManager
     
     @State private var name: String = ""
     @State private var selectedBreed: DogBreed = .labrador
     @State private var age: Int = 1
     @State private var interestText: String = ""
     @State private var interests: [String] = []
+    @State private var aboutMe: String = ""
+    @State private var ownerName: String = ""
     @State private var showingDeleteAlert = false
     @State private var interestToDelete: String = ""
     
@@ -19,16 +22,52 @@ struct AddDogView: View {
     @State private var selectedImages: [UIImage?] = [nil, nil, nil, nil, nil]
     @State private var currentEditingIndex: Int? = nil
     
+    // Generate a unique owner ID for each new dog
+    private let ownerId = UUID()
+    
     // Maximum number of photos allowed
     private let maxPhotos = 5
     
-    // TODO: Default location (Los Angeles area) - in a real app, you might use user's location
-    @State private var location = Location(latitude: 34.0522, longitude: -118.2437)
+    // Minimum number of photos acquired
+    private let minPhotos = 2
+    
+    // Computed property to get current location or default
+    private var currentLocation: Location {
+        if let userLocation = locationManager.userLocation {
+            return Location(latitude: userLocation.coordinate.latitude, longitude: userLocation.coordinate.longitude)
+        } else {
+            // Fallback to Los Angeles area if no location available
+            return Location(latitude: 34.0522, longitude: -118.2437)
+        }
+    }
+    
+    // Location display properties
+    private var locationDisplayText: String {
+        if locationManager.userLocation != nil {
+            return "Current Location"
+        } else {
+            return "Los Angeles Area (Default)"
+        }
+    }
+    
+    private var locationDescriptionText: String {
+        if locationManager.userLocation != nil {
+            return "Using your current location"
+        } else {
+            return "Using default location - enable location access for precise positioning"
+        }
+    }
+    
+    private var hasMinimumPhotos: Bool {
+        let validImages = selectedImages.compactMap { $0 }
+        return validImages.count >= minPhotos
+    }
     
     private var isFormValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        age > 0
-        // Interests are now optional
+        age > 0 &&
+        hasMinimumPhotos
+        // Interests and AbooutMe are now optional
     }
     
     var body: some View {
@@ -36,9 +75,7 @@ struct AddDogView: View {
             Form {
                 Section(header: Text("Photos")) {
                     VStack(spacing: 16) {
-                        Text("Add up to 5 photos")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        let photoCount = selectedImages.compactMap { $0 }.count
                         
                         // Grid of photo upload blocks
                         LazyVGrid(columns: [
@@ -46,7 +83,7 @@ struct AddDogView: View {
                             GridItem(.flexible()),
                             GridItem(.flexible())
                         ], spacing: 12) {
-                            ForEach(0..<maxPhotos, id: \.self) { index in
+                            ForEach(minPhotos..<maxPhotos, id: \.self) { index in
                                 PhotoUploadBlock(
                                     image: selectedImages[index],
                                     index: index,
@@ -54,6 +91,18 @@ struct AddDogView: View {
                                     onDelete: { deletePhoto(at: index) }
                                 )
                             }
+                        }
+                        
+                        // Photo requirement message
+                        if !hasMinimumPhotos {
+                            HStack {
+                                Image(systemName: "info.circle")
+                                    .foregroundColor(.orange)
+                                Text("Please add at least \(minPhotos) photos to continue")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            }
+                            .padding(.top, 8)
                         }
                     }
                     .padding(.vertical, 8)
@@ -64,13 +113,13 @@ struct AddDogView: View {
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                     
                     Picker("Breed", selection: $selectedBreed) {
-                        ForEach(DogBreed.allCases, id: \.self) { breed in
+                        ForEach(DogBreed.sortedBreeds, id: \.self) { breed in
                             Text(breed.rawValue).tag(breed)
                         }
                     }
                     .pickerStyle(MenuPickerStyle())
                     
-                    Stepper("Age: \(age) year\(age == 1 ? "" : "s")", value: $age, in: 1...20)
+                    Stepper("Age: \(age) year\(age == 1 ? "" : "s")", value: $age, in: 1...50)
                 }
                 
                 Section(header: Text("Interests")) {
@@ -84,6 +133,7 @@ struct AddDogView: View {
                         .disabled(interestText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     
+                    // TODO: fix this, not working
                     if !interests.isEmpty {
                         FlowLayout(spacing: 8) {
                             ForEach(interests, id: \.self) { interest in
@@ -105,17 +155,36 @@ struct AddDogView: View {
                     }
                 }
                 
+                Section(header: Text("About Me")) {
+                    TextField("Tell us about your dog (optional)", text: $aboutMe, axis: .vertical)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .lineLimit(3...10)
+                    
+                    Text("Share what makes your dog special")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Section(header: Text("Owner Information")) {
+                    TextField("Your name", text: $ownerName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    
+                    Text("This will be shown to other dog owners")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
                 Section(header: Text("Location")) {
                     HStack {
                         Image(systemName: "location.circle.fill")
-                            .foregroundColor(.blue)
-                        Text("Los Angeles Area")
+                            .foregroundColor(locationManager.userLocation != nil ? .blue : .orange)
+                        Text(locationDisplayText)
                         Spacer()
                         Text("📍")
                     }
                     .padding(.vertical, 4)
                     
-                    Text("Location will be set to your current area")
+                    Text(locationDescriptionText)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -124,17 +193,23 @@ struct AddDogView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
+                    Button(action: {
                         dismiss()
+                    }) {
+                        Image(systemName: "xmark")
                     }
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") {
+                    Button(action: {
+                        // TODO: toggle button to set dog's online status upon their choose,
+                        // mention they can change the status in setting as well, or add a button on the "My dog" page to easily toggle
                         saveDog()
+                    }) {
+                        Image(systemName: "checkmark")
                     }
                     .disabled(!isFormValid)
-                    .foregroundColor(isFormValid ? .blue : .gray)
+                    .foregroundColor(isFormValid ? Color.primary : .gray)
                 }
             }
             .photosPicker(
@@ -200,8 +275,11 @@ struct AddDogView: View {
             breed: selectedBreed,
             age: age,
             interests: interests,
-            location: location,
-            photos: validImages.isEmpty ? nil : validImages
+            location: currentLocation,
+            photos: validImages.isEmpty ? nil : validImages,
+            aboutMe: aboutMe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : aboutMe.trimmingCharacters(in: .whitespacesAndNewlines),
+            ownerName: ownerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : ownerName.trimmingCharacters(in: .whitespacesAndNewlines),
+            ownerId: ownerId
         )
         dismiss()
     }

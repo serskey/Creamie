@@ -17,6 +17,7 @@ struct MapView: View {
     @State private var showingFilters = false
     @State private var selectedBreeds: Set<DogBreed> = Set(DogBreed.popularBreeds)
     @State private var isTrackingUserLocation = true
+    @State private var searchText = ""
     
     // MARK: - Computed Properties
     private var hasLocationPermission: Bool {
@@ -25,7 +26,13 @@ struct MapView: View {
     }
 
     private var filteredDogs: [Dog] {
-        viewModel.nearbyDogs.filter { selectedBreeds.contains($0.breed) }
+        viewModel.nearbyDogs.filter { dog in
+            let matchesBreed = selectedBreeds.contains(dog.breed)
+            let matchesSearch = searchText.isEmpty || 
+                               dog.name.lowercased().contains(searchText.lowercased()) ||
+                               dog.breed.rawValue.lowercased().contains(searchText.lowercased())
+            return matchesBreed && matchesSearch
+        }
     }
     
     // MARK: - Body
@@ -94,7 +101,7 @@ private extension MapView {
         DragGesture()
             .onChanged { _ in
                 isTrackingUserLocation = false
-            }
+                    }
             .onEnded { _ in
                 viewModel.debouncedFetchDogs()
             }
@@ -131,7 +138,32 @@ private extension MapView {
     }
     
     var searchAndFilterBar: some View {
-        HStack {
+        HStack(spacing: 12) {
+            // Search Bar
+            HStack {
+                Image("magnifyingglass")
+                
+                TextField("Search dogs...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 16))
+                
+                if !searchText.isEmpty {
+                    Button(action: {
+                        searchText = ""
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.gray)
+                            .font(.system(size: 14))
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.clear)
+            .glassEffect(.clear.tint(Color.clear).interactive())
+            .cornerRadius(25)
+            
+            // Filter Button
             filterButton
         }
         .padding(.leading, 16)
@@ -310,6 +342,8 @@ class MapViewModel: ObservableObject {
                 }
             } catch {
                 await MainActor.run {
+                    // TODO: Print out error
+                    print("Failed to fetch dogs")
                     self.nearbyDogs = []
                 }
             }

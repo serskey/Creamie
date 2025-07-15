@@ -21,18 +21,7 @@ struct DogLocationRequest: Codable {
     let timestamp: Date
 }
 
-struct NearbyDogsRequest: Codable {
-    // entire map bounding box
-    let northEastLat: Double
-    let northEastLon: Double
-    let southWestLat: Double
-    let southWestLon: Double
-}
-
-struct NearbyDogsResponse: Codable {
-    let dogs: [Dog]
-    let totalCount: Int
-}
+// Note: NearbyDogsRequest and NearbyDogsResponse are now defined in BackendModel.swift
 
 // MARK: - Real-time Location Service
 class DogLocationService: ObservableObject {
@@ -48,10 +37,9 @@ class DogLocationService: ObservableObject {
     
     private init() {}
     
-    // MARK: - REST API Methods
-    
     /// Fetch nearby dogs from the server
     func fetchNearbyDogs(request: NearbyDogsRequest) async throws -> NearbyDogsResponse {
+        print("Fetching nearby dogs from backend...")
         let response = try await apiService.request(
             endpoint: "/dogs/nearby",
             method: .POST,
@@ -63,6 +51,7 @@ class DogLocationService: ObservableObject {
             self.nearbyDogs = response.dogs
         }
         
+        print("Fetched \(response.totalCount) nearby dogs from backend")
         return response
     }
     
@@ -93,7 +82,6 @@ class DogLocationService: ObservableObject {
     }
     
     // MARK: - Real-time WebSocket Connection
-    
     /// Start real-time location updates for a specific area
     func startRealTimeUpdates(userLocation: CLLocationCoordinate2D, radius: Double = 5.0) {
         // Close existing connection if any
@@ -210,10 +198,14 @@ class DogLocationService: ObservableObject {
                         breed: updatedDog.breed,
                         age: updatedDog.age,
                         interests: updatedDog.interests,
-                        location: update.location,
-                        photos: updatedDog.photos,
                         aboutMe: updatedDog.aboutMe,
-                        ownerName: updatedDog.ownerName
+                        photos: updatedDog.photos,
+                        location: update.location,
+                        ownerId: updatedDog.ownerId,
+                        ownerName: updatedDog.ownerName,
+                        isOnline: true,
+                        updatedAt: Date.now,
+                        createdAt: Date.now
                     )
                     self.nearbyDogs[index] = updatedDog
                 } else if update.isOnline {

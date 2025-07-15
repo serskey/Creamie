@@ -2,90 +2,18 @@ import Foundation
 import CoreLocation
 import UIKit
 
-// MARK: - Data Models for API
-struct DogResponse: Codable {
-    let id: UUID
-    let name: String
-    let breed: String
-    let age: Int
-    let interests: [String]?
-    let location: Location
-    let photos: [String]
-    let aboutMe: String?
-    let ownerName: String?
-    let createdAt: Date
-    let updatedAt: Date
-    
-    // Convert to local Dog model
-    func toDog() -> Dog {
-        return Dog(
-            id: id,
-            name: name,
-            breed: DogBreed(rawValue: breed) ?? .cockapoo,
-            age: age,
-            interests: interests,
-            location: location,
-            photos: photos,
-            aboutMe: aboutMe,
-            ownerName: ownerName
-        )
-    }
-}
-
-struct LocationResponse: Codable {
-    let latitude: Double
-    let longitude: Double
-    
-    var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-    }
-}
-
-struct CreateDogRequest: Codable {
-    let name: String
-    let breed: String
-    let age: Int
-    let interests: [String]?
-    let location: LocationResponse
-    let aboutMe: String?
-    let ownerName: String?
-    
-    init(from dog: Dog) {
-        self.name = dog.name
-        self.breed = dog.breed.rawValue
-        self.age = dog.age
-        self.interests = dog.interests
-        self.location = LocationResponse(
-            latitude: dog.location.latitude,
-            longitude: dog.location.longitude
-        )
-        self.aboutMe = dog.aboutMe
-        self.ownerName = dog.ownerName
-    }
-    
-    init(name: String, breed: String, age: Int, interests: [String]?, location: LocationResponse, aboutMe: String?, ownerName: String?) {
-        self.name = name
-        self.breed = breed
-        self.age = age
-        self.interests = interests
-        self.location = location
-        self.aboutMe = aboutMe
-        self.ownerName = ownerName
-    }
-}
-
 struct UpdateDogRequest: Codable {
     let name: String?
     let breed: String?
     let age: Int?
     let interests: [String]?
-    let location: LocationResponse?
+    let location: Location?
     let aboutMe: String?
     let ownerName: String?
 }
 
 struct DogsResponse: Codable {
-    let dogs: [DogResponse]
+    let dogs: [Dog]
     let totalCount: Int
     let page: Int
     let pageSize: Int
@@ -102,96 +30,81 @@ class DogProfileService {
     // MARK: - CRUD Operations
     
     /// Fetch all dogs for the current user
-    func fetchUserDogs() async throws -> [Dog] {
+    func fetchUserDogs(getUserDogsRequest: GetUserDogsRequest) async throws -> GetUserDogsResponse {
+        let endpoint = "/user/\(getUserDogsRequest.userId)/dogs"
         let response = try await apiService.request(
-            endpoint: "/dogs/user",
-            method: .GET,
-            responseType: DogsResponse.self
-        )
-        
-        return response.dogs.map { $0.toDog() }
-    }
-    
-    /// Fetch dogs with pagination
-    func fetchDogs(page: Int = 1, pageSize: Int = 20) async throws -> DogsResponse {
-        let endpoint = "/dogs?page=\(page)&pageSize=\(pageSize)"
-        return try await apiService.request(
             endpoint: endpoint,
             method: .GET,
-            responseType: DogsResponse.self
+            responseType: GetUserDogsResponse.self
         )
+        
+        return response
     }
     
     /// Get a specific dog by ID
     func getDog(id: UUID) async throws -> Dog {
         let response = try await apiService.request(
-            endpoint: "/dogs/\(id.uuidString)",
+            endpoint: "/dogs/dog/\(id.uuidString)",
             method: .GET,
-            responseType: DogResponse.self
+            responseType: Dog.self
         )
         
-        return response.toDog()
+        return response
     }
     
     /// Create a new dog profile
-    func createDog(name: String, breed: DogBreed, age: Int, interests: [String]?, location: Location, aboutMe: String?, ownerName: String?) async throws -> Dog {
-        let request = CreateDogRequest(
-            name: name,
-            breed: breed.rawValue,
-            age: age,
-            interests: interests,
-            location: LocationResponse(latitude: location.latitude, longitude: location.longitude),
-            aboutMe: aboutMe,
-            ownerName: ownerName
-        )
+    func createDog(addDogRequest: AddDogRequest) async throws -> AddDogResponse {
         
         let response = try await apiService.request(
-            endpoint: "/dogs",
+            endpoint: "/dogs/add",
             method: .POST,
-            body: request,
-            responseType: DogResponse.self
+            body: addDogRequest,
+            responseType: AddDogResponse.self
         )
         
-        return response.toDog()
+        return response
     }
     
     /// Update an existing dog profile
-    func updateDog(id: UUID, name: String?, breed: DogBreed?, age: Int?, interests: [String]?, location: Location?, aboutMe: String?, ownerName: String?) async throws -> Dog {
-        var locationResponse: LocationResponse?
-        if let location = location {
-            locationResponse = LocationResponse(latitude: location.latitude, longitude: location.longitude)
-        }
+    func updateDog(
+        id: UUID,
+        name: String?,
+        breed: DogBreed?,
+        age: Int?,
+        interests: [String]?,
+        location: Location?,
+        aboutMe: String?,
+        ownerName: String?
+    ) async throws -> Dog {
         
         let request = UpdateDogRequest(
             name: name,
             breed: breed?.rawValue,
             age: age,
             interests: interests,
-            location: locationResponse,
+            location: location,
             aboutMe: aboutMe,
             ownerName: ownerName
         )
         
         let response = try await apiService.request(
-            endpoint: "/dogs/\(id.uuidString)",
+            endpoint: "/dogs/dog/\(id.uuidString)",
             method: .PUT,
             body: request,
-            responseType: DogResponse.self
+            responseType: Dog.self
         )
         
-        return response.toDog()
+        return response
     }
     
     /// Delete a dog profile
     func deleteDog(id: UUID) async throws {
         let _: EmptyResponse = try await apiService.request(
-            endpoint: "/dogs/\(id.uuidString)",
+            endpoint: "/dogs/dog/\(id.uuidString)",
             method: .DELETE,
             responseType: EmptyResponse.self
         )
     }
-    
-    // MARK: - Photo Management
     
     /// Upload a photo for a dog
     func uploadDogPhoto(dogId: UUID, image: UIImage) async throws -> String {
@@ -229,8 +142,6 @@ class DogProfileService {
         )
     }
     
-    // MARK: - Search and Filter
-    
     /// Search dogs by various criteria
     func searchDogs(name: String?, breed: String?, location: Location?, radius: Double?) async throws -> [Dog] {
         var queryItems: [String] = []
@@ -258,7 +169,7 @@ class DogProfileService {
             responseType: DogsResponse.self
         )
         
-        return response.dogs.map { $0.toDog() }
+        return response.dogs.map { $0 }
     }
     
     /// Get dogs by breed
@@ -269,7 +180,7 @@ class DogProfileService {
             responseType: DogsResponse.self
         )
         
-        return response.dogs.map { $0.toDog() }
+        return response.dogs.map { $0 }
     }
     
     /// Get dogs within a specific radius
@@ -281,7 +192,7 @@ class DogProfileService {
             responseType: DogsResponse.self
         )
         
-        return response.dogs.map { $0.toDog() }
+        return response.dogs.map { $0 }
     }
 }
 
