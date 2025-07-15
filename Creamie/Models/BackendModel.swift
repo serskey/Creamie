@@ -12,7 +12,8 @@ struct AddDogRequest: Codable {
     let breed: String
     let age: Int
     let interests: [String]?
-    let location: Location
+    let latitude: Double
+    let longitude: Double
     let photos: [String]
     let aboutMe: String?
     let ownerName: String?

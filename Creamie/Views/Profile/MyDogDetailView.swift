@@ -17,7 +17,7 @@ struct MyDogDetailView: View {
         self.profileViewModel = profileViewModel
         _healthViewModel = StateObject(wrappedValue: DogHealthViewModel(dogId: dog.id))
         _cameraPosition = State(initialValue: .region(MKCoordinateRegion(
-            center: dog.location.coordinate,
+            center: CLLocationCoordinate2D(latitude: dog.latitude, longitude: dog.longitude),
             span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
         )))
     }

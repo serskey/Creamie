@@ -28,7 +28,7 @@ struct FullScreenMapView: View {
     init(dog: Dog) {
         self.dog = dog
         _cameraPosition = State(initialValue: .region(MKCoordinateRegion(
-            center: dog.location.coordinate,
+            center: CLLocationCoordinate2D(latitude: dog.latitude, longitude: dog.longitude),
             span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
         )))
     }
@@ -36,7 +36,7 @@ struct FullScreenMapView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Map(position: $cameraPosition, selection: .constant(nil), scope: nil) {
-                Annotation(dog.name, coordinate: dog.location.coordinate) {
+                Annotation(dog.name, coordinate: CLLocationCoordinate2D(latitude: dog.latitude, longitude: dog.longitude)) {
                     Image(systemName: "pawprint.circle.fill")
                         .font(.title)
                         .foregroundColor(.blue)
@@ -73,7 +73,7 @@ struct FullScreenMapView: View {
                 
                 Button(action: {
                     // Open in Maps app
-                    let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: dog.location.coordinate))
+                    let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: dog.latitude, longitude: dog.longitude)))
                     mapItem.name = "\(dog.name)'s Location"
                     mapItem.openInMaps(launchOptions: nil)
                 }) {

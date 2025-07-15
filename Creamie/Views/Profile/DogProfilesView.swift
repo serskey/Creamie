@@ -147,7 +147,7 @@ struct DogProfilesView: View {
                     .font(.title.bold())
                     .foregroundColor(.primary)
                 
-                Text("Add your first furry friend to get started with the liquid glass experience")
+                Text("Add your first furry friend to get started with this dog world")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -458,52 +458,6 @@ struct DogProfilesView: View {
         let icon: String
         let title: String
         let value: String
-    }
-    
-    private struct EmptyDogListView: View {
-        @ObservedObject var viewModel: DogProfileViewModel
-        
-        var body: some View {
-            VStack(spacing: 20) {
-                Image(systemName: "dog.circle")
-                    .font(.system(size: 80))
-                    .foregroundColor(.gray.opacity(0.6))
-                
-                VStack(spacing: 8) {
-                    Text("No Dogs Yet!")
-                        .font(.title2.bold())
-                        .foregroundColor(.primary)
-                    
-                    Text("Add your first furry friend to get started")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                
-                Button(action: {
-                    viewModel.showingAddDog = true
-                }) {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Add Your First Dog")
-                    }
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding()
-                    .background(Color.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                
-                Button("Refresh") {
-                    Task {
-                        await viewModel.fetchUserDogs(userId: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!)
-                    }
-                }
-                .font(.subheadline)
-                .foregroundColor(.blue)
-            }
-            .padding()
-        }
     }
     
 }

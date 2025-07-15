@@ -83,7 +83,7 @@ private extension MapView {
                         
             // Dog markers
                         ForEach(filteredDogs) { dog in
-                Annotation(dog.name, coordinate: dog.location.coordinate) {
+                Annotation(dog.name, coordinate: CLLocationCoordinate2D(latitude: dog.latitude, longitude: dog.longitude)) {
                                 DogMarker(dog: dog)
                             }
                             .tag(dog)

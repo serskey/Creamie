@@ -19,7 +19,8 @@ struct Dog: Identifiable, Hashable, Codable {
     var interests: [String]?
     var aboutMe: String?
     var photos: [String]
-    var location: Location
+    var latitude: Double
+    var longitude: Double
     var ownerId: UUID
     var ownerName: String?
     var isOnline: Bool
@@ -47,7 +48,8 @@ struct Dog: Identifiable, Hashable, Codable {
             interests: [String]? = nil,
             aboutMe: String? = nil,
             photos: [String],
-            location: Location,
+            latitude: Double,
+            longitude: Double,
             ownerId: UUID,
             ownerName: String? = nil,
             isOnline: Bool,
@@ -59,7 +61,8 @@ struct Dog: Identifiable, Hashable, Codable {
             self.breed = breed
             self.age = age
             self.interests = interests
-            self.location = location
+            self.latitude = latitude
+            self.longitude = longitude
             self.photos = photos
             self.aboutMe = aboutMe
             self.ownerId = ownerId

@@ -4,6 +4,7 @@
 
 import SwiftUI
 import UIKit
+import CoreLocation
 
 struct DogPreviewCard: View {
     let dog: Dog
@@ -72,7 +73,7 @@ struct DogPreviewCard: View {
                 // dog location
                 HStack(spacing: 12) {
                     Button(action: {
-                        let coordinates = dog.location.coordinate
+                        let coordinates = CLLocationCoordinate2D(latitude: dog.latitude, longitude: dog.longitude)
                         let url = URL(string: "maps://?saddr=&daddr=\(coordinates.latitude),\(coordinates.longitude)")
                         if let url = url, UIApplication.shared.canOpenURL(url) {
                             UIApplication.shared.open(url)
