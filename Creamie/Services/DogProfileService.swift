@@ -106,32 +106,44 @@ class DogProfileService {
         )
     }
     
-    /// Upload a photo for a dog
-    func uploadDogPhoto(dogId: UUID, image: UIImage) async throws -> String {
-        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
+    func uploadDogPhoto(dogId: UUID, image: UIImage) async throws -> UploadDogPhotoResponse {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             throw APIError.networkError(NSError(domain: "ImageError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"]))
         }
-        
-        // Create multipart form data
-        let boundary = "Boundary-\(UUID().uuidString)"
-        let url = URL(string: APIConfig.baseURL + "/dogs/\(dogId.uuidString)/photos")!
-        var request = URLRequest(url: url)
+
+        let boundary = UUID().uuidString
+        var request = URLRequest(url: URL(string: "\(apiService.baseURL)/dogs/upload_photo")!)
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
+
         var body = Data()
-        body.append("--\(boundary)\r\n")
-        body.append("Content-Disposition: form-data; name=\"photo\"; filename=\"dog_photo.jpg\"\r\n")
-        body.append("Content-Type: image/jpeg\r\n\r\n")
+
+        // Add dog_id
+        body.appendString("--\(boundary)\r\n")
+        body.appendString("Content-Disposition: form-data; name=\"dog_id\"\r\n\r\n")
+        body.appendString("\(dogId.uuidString)\r\n")
+
+        // Add photo file
+        body.appendString("--\(boundary)\r\n")
+        body.appendString("Content-Disposition: form-data; name=\"photo\"; filename=\"photo.jpg\"\r\n")
+        body.appendString("Content-Type: image/jpeg\r\n\r\n")
         body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n")
-        
+        body.appendString("\r\n")
+
+        // Close boundary
+        body.appendString("--\(boundary)--\r\n")
+
         request.httpBody = body
-        
-        // This is a simplified implementation - you'd need to implement proper multipart upload
-        // For now, return a placeholder filename
-        return "uploaded_photo_\(UUID().uuidString).jpg"
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.networkError(NSError(domain: "UploadError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed with status code \((response as? HTTPURLResponse)?.statusCode ?? 0)"]))
+        }
+
+        let uploadDogPhotoResponse = try JSONDecoder().decode(UploadDogPhotoResponse.self, from: data)
+        return uploadDogPhotoResponse
     }
+
     
     /// Delete a photo for a dog
     func deleteDogPhoto(dogId: UUID, photoName: String) async throws {
@@ -198,7 +210,7 @@ class DogProfileService {
 
 // MARK: - Helper Extensions
 extension Data {
-    mutating func append(_ string: String) {
+    mutating func appendString(_ string: String) {
         if let data = string.data(using: .utf8) {
             append(data)
         }

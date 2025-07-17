@@ -25,10 +25,19 @@ class DogProfileViewModel: ObservableObject {
         do {
             let response = try await dogProfileService.fetchUserDogs(getUserDogsRequest: getUserDogsRequest)
             self.dogs = response.dogs
+            
+            // Debug: Print photo URLs to verify backend data
+            for dog in response.dogs {
+                print("🐕 Dog \(dog.name) photos:")
+                for (index, photo) in dog.photos.enumerated() {
+                    print("  Photo \(index + 1): \(photo)")
+                }
+            }
+            
             print("Fetched \(response.totalCount) dogs from user \(userId)")
         } catch {
             // TODO: Add error detail from backend
-            print("Failed to fetch user's dogs")
+            print("Failed to fetch user's dogs: \(error)")
             self.dogs = []
         }
     }
@@ -45,17 +54,8 @@ class DogProfileViewModel: ObservableObject {
         ownerId: UUID,
         isOnline: Bool
     ) {
-        // Generate unique photo names for each image (UI ensures >= 2 photos)
+        // Will upload photos after dog creation succeeds
         var photoNames: [String] = []
-        
-        for (index) in photos.enumerated() {
-            let photoName = "dog_\(name.replacingOccurrences(of: " ", with: "_"))_\(photoCounter)_\(index)"
-            photoCounter += 1
-        
-//             // TODO: Save to backend db
-//                saveImage(photo, withName: photoName)
-            photoNames.append(photoName)
-        }
         
         // Save dog to backend database first
         Task {
@@ -76,31 +76,53 @@ class DogProfileViewModel: ObservableObject {
                 )
                 
                 response = try await DogProfileService.shared.createDog(addDogRequest: addDogRequest)
-                print("Successfully saved dog to backend: \(String(describing: response?.dogId))")
                 
-                // Only add to local array if backend save succeeded
-                let newDog = Dog(
-                    id: UUID(),
-                    name: name,
-                    breed: breed,
-                    age: age,
-                    interests: interests,
-                    aboutMe: aboutMe,
-                    photos: photoNames,
-                    latitude: location.latitude,
-                    longitude: location.longitude,
-                    ownerId: ownerId,
-                    ownerName: ownerName,
-                    isOnline: isOnline,
-                    updatedAt: Date.now,
-                    createdAt: Date.now
-                )
-                
-                dogs.append(newDog)
-                showingAddDog = false
-                
-                // Show success message
-                self.addDogSuccess = "\(name) has been successfully added to your dogs!"
+                // Check if backend response indicates success
+                if let response = response, response.status.lowercased() == "success", let dogId = response.dogId {
+                    print("Successfully saved dog to backend: \(dogId)")
+                    
+                    // Upload ALL photos - this must succeed for minimum photos requirement
+                    photoNames = await uploadPhotos(photos, for: dogId)
+                    
+                    // Check if we have the minimum required photos (2 minimum from UI validation)
+                    if photoNames.count >= 2 {
+                        // SUCCESS: Both dog creation and photo upload succeeded
+                        let newDog = Dog(
+                            id: dogId,
+                            name: name,
+                            breed: breed,
+                            age: age,
+                            interests: interests,
+                            aboutMe: aboutMe,
+                            photos: photoNames,
+                            latitude: location.latitude,
+                            longitude: location.longitude,
+                            ownerId: ownerId,
+                            ownerName: ownerName,
+                            isOnline: isOnline,
+                            updatedAt: Date.now,
+                            createdAt: Date.now
+                        )
+                        
+                        dogs.append(newDog)
+                        showingAddDog = false
+                        
+                        // Show success message
+                        let photoCount = photoNames.count
+                        self.addDogSuccess = "\(name) has been successfully added with \(photoCount) photo(s)!"
+                    } else {
+                        // FAILURE: Photo upload failed - rollback dog creation
+                        print("Photo upload failed (\(photoNames.count)/\(photos.count) uploaded), rolling back dog creation")
+                        // TODO: Add backend API to delete the created dog
+                        // await DogProfileService.shared.deleteDog(dogId: dogId)
+                        
+                        self.addDogError = "Failed to upload enough photos for \(name). At least 2 photos are required. Please try again."
+                    }
+                } else {
+                    // Backend returned failure status
+                    let errorMessage = response?.error ?? "Unknown error occurred"
+                    self.addDogError = "Unable to save \(name): \(errorMessage)"
+                }
                 
             } catch {
                 print("Failed to save dog to backend: \(String(describing: response?.error))")
@@ -146,18 +168,33 @@ class DogProfileViewModel: ObservableObject {
         showingDeleteConfirmation = true
     }
     
-    private func saveImage(_ image: UIImage, withName name: String) {
-        guard let data = image.jpegData(compressionQuality: 0.7) else { return }
+    // MARK: - Photo Upload Functions
+    
+    /// Upload multiple photos for a dog to the backend
+    /// - Parameters:
+    ///   - photos: Array of UIImages to upload
+    ///   - dogId: UUID of the dog to associate photos with
+    /// Uploads all photos for a dog. Uses all-or-nothing approach.
+    /// - Returns: Array of successfully uploaded photo filenames (empty if any upload fails)
+    private func uploadPhotos(_ photos: [UIImage], for dogId: UUID) async -> [String] {
+        var photoNames: [String] = []
         
-        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsDirectory.appendingPathComponent("\(name).jpg")
-        
-        do {
-            try data.write(to: fileURL)
-            print("Saved image to: \(fileURL.path)")
-        } catch {
-            print("Error saving image: \(error)")
+        // Try to upload all photos to backend supabase storage
+        for (index, photo) in photos.enumerated() {
+            do {
+                let response = try await DogProfileService.shared.uploadDogPhoto(dogId: dogId, image: photo)
+                photoNames.append(response.imageUrl)
+                
+            } catch {
+                print("Failed to upload photo \(index + 1): \(error)")
+                // ALL-OR-NOTHING: If any photo fails, return empty array
+                // This ensures consistent user experience - dog only appears with all intended photos
+                return []
+            }
         }
+        
+        print("All \(photoNames.count) photos uploaded")
+        return photoNames
     }
     
     private func deleteImage(named name: String) {
@@ -171,4 +208,31 @@ class DogProfileViewModel: ObservableObject {
             print("Error deleting image: \(error)")
         }
     }
+    
+//    /// Save an image to the Documents directory with a specific filename
+//    /// - Parameters:
+//    ///   - image: The UIImage to save
+//    ///   - name: The filename to use (without extension)
+//    /// - Returns: The filename that was saved (for consistency)
+//    private func saveImage(_ image: UIImage, name: String) -> String {
+//        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+//        
+//        // Remove any file extension and add .jpg
+//        let cleanName = name.replacingOccurrences(of: ".jpg", with: "").replacingOccurrences(of: ".jpeg", with: "")
+//        let filename = "\(cleanName).jpg"
+//        let fileURL = documentsDirectory.appendingPathComponent(filename)
+//        
+//        if let imageData = image.jpegData(compressionQuality: 0.8) {
+//            do {
+//                try imageData.write(to: fileURL)
+//                print("Saved image locally: \(filename)")
+//                return cleanName // Return name without extension for consistency
+//            } catch {
+//                print("Error saving image \(filename): \(error)")
+//                return cleanName // Return the name even if saving failed
+//            }
+//        }
+//        
+//        return cleanName
+//    }
 }

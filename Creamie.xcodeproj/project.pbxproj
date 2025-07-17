@@ -228,6 +228,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				0E8A8B872E232B8700E2BE2D /* XCRemoteSwiftPackageReference "SwiftUIPager" */,
+				0EDA566C2E273CC8009230BA /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0E91729B2E1A3450001D0FF5 /* Products */;
@@ -608,6 +609,14 @@
 			requirement = {
 				branch = main;
 				kind = branch;
+			};
+		};
+		0EDA566C2E273CC8009230BA /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase-community/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

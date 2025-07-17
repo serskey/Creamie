@@ -57,8 +57,44 @@ struct ZoomablePhotoView: View {
                     }
                 
                 ZStack {
-                    // First try to load from asset catalog
-                    if let uiImage = UIImage(named: imageName) {
+                    // Check if imageName is a Supabase backend URL
+                    if imageName.hasPrefix("https://") && imageName.contains("supabase.co") {
+                        // Load from backend URL using AsyncImage
+                        AsyncImage(url: URL(string: imageName)) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFit()
+                                    .scaleEffect(scale)
+                                    .offset(offset)
+                                    .gesture(dragGesture)
+                                    .gesture(magnificationGesture)
+                                    .gesture(doubleTapGesture)
+                                    .background(Color(.systemBackground))
+                            case .failure(_):
+                                // Error loading from backend
+                                ZStack {
+                                    Color.red.opacity(0.3)
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .foregroundColor(.red)
+                                        .font(.largeTitle)
+                                }
+                            case .empty:
+                                // Loading placeholder
+                                ZStack {
+                                    Color.gray.opacity(0.3)
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(1.5)
+                                }
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                        
+                    } else if let uiImage = UIImage(named: imageName) {
+                        // Load from asset catalog (for sample dogs)
                         Image(uiImage: uiImage)
                             .resizable()
                             .scaledToFit()
@@ -69,25 +105,12 @@ struct ZoomablePhotoView: View {
                             .gesture(doubleTapGesture)
                             .background(Color(.systemBackground))
                     } else {
-                        // If not in assets, try documents directory
-                        if let uiImage = loadImageFromDocuments(named: imageName) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                                .scaleEffect(scale)
-                                .offset(offset)
-                                .gesture(dragGesture)
-                                .gesture(magnificationGesture)
-                                .gesture(doubleTapGesture)
-                                .background(Color(.systemBackground))
-                        } else {
-                            // Fallback if image can't be loaded
-                            ZStack {
-                                Color.gray.opacity(0.3)
-                                Image(systemName: "photo")
-                                    .font(.largeTitle)
-                                    .foregroundColor(.gray)
-                            }
+                        // Fallback if image can't be loaded
+                        ZStack {
+                            Color.gray.opacity(0.3)
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.gray)
                         }
                     }
                 }

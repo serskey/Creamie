@@ -7,36 +7,10 @@ struct APIConfig {
     static let timeout: TimeInterval = 30.0
 }
 
-// MARK: - API Error Types
-enum APIError: Error, LocalizedError {
-    case invalidURL
-    case noData
-    case decodingError
-    case networkError(Error)
-    case serverError(Int)
-    case unauthorized
-    
-    var errorDescription: String? {
-        switch self {
-        case .invalidURL:
-            return "Invalid URL"
-        case .noData:
-            return "No data received"
-        case .decodingError:
-            return "Failed to decode response"
-        case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
-        case .serverError(let code):
-            return "Server error with code: \(code)"
-        case .unauthorized:
-            return "Unauthorized access"
-        }
-    }
-}
-
 // MARK: - Base API Service
 class APIService {
     static let shared = APIService()
+    let baseURL = APIConfig.baseURL
     
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -144,4 +118,31 @@ enum HTTPMethod: String {
     case PUT = "PUT"
     case DELETE = "DELETE"
     case PATCH = "PATCH"
-} 
+}
+
+// MARK: - API Error Types
+enum APIError: Error, LocalizedError {
+    case invalidURL
+    case noData
+    case decodingError
+    case networkError(Error)
+    case serverError(Int)
+    case unauthorized
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Invalid URL"
+        case .noData:
+            return "No data received"
+        case .decodingError:
+            return "Failed to decode response"
+        case .networkError(let error):
+            return "Network error: \(error.localizedDescription)"
+        case .serverError(let code):
+            return "Server error with code: \(code)"
+        case .unauthorized:
+            return "Unauthorized access"
+        }
+    }
+}

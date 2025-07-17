@@ -75,11 +75,20 @@ struct ContentView: View {
         }
         .alert("Location Access Required", isPresented: $showingLocationAlert) {
             Button("Open Settings") {
+                // TODO: Go deeply to this specific app's location setting
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url, options: [:], completionHandler: nil)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            .buttonStyle(.glassProminent)
+            .tint(.purple)
+            
+            Button("Cancel", role: .cancel) {
+                
+            }
+            .buttonStyle(.glassProminent)
+            .tint(.pink)
+
         } message: {
             Text("Creamie needs access to your location to show nearby dogs. Please enable location access in Settings.")
         }

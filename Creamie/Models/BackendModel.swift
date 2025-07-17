@@ -37,7 +37,6 @@ struct GetUserDogsResponse: Codable {
 }
 
 
-// MARK: - Nearby Dogs API Models
 struct NearbyDogsRequest: Codable {
     let northEastLat: Double
     let northEastLon: Double
@@ -46,9 +45,18 @@ struct NearbyDogsRequest: Codable {
 }
 
 
-
 struct NearbyDogsResponse: Codable {
     let dogs: [Dog]
     let totalCount: Int
 }
 
+struct UploadDogPhotoRequest: Codable {
+    let dogId: UUID
+    let imageData: Data
+}
+
+struct UploadDogPhotoResponse: Codable {
+    let dogId: UUID
+    let imageUrl: String
+    let photos: [String]
+}

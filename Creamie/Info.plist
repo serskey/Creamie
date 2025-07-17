@@ -8,5 +8,9 @@
 	<array>
 		<string>app-settings</string>
 	</array>
+    <key>SUPABASE_URL</key>
+    <string>https://bibnhxcfmdpwqcfftgtj.supabase.co</string>
+    <key>SUPABASE_ANON_KEY</key>
+    <string>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpYm5oeGNmbWRwd3FjZmZ0Z3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0ODgxMTgsImV4cCI6MjA2ODA2NDExOH0.zQbfeQK102deY5ono6JT-q6V5X-AfEdIf6Wji9aC59o</string>
 </dict>
 </plist>

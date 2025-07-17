@@ -83,9 +83,9 @@ struct DogProfilesView: View {
                     .resizable()
                     .scaledToFit()
                     .ignoresSafeArea()
-                    .opacity(0.4)
+                    .opacity(0.15)
             } else {
-                Color.gray.opacity(0.1)
+                Color.clear
                     .ignoresSafeArea()
             }
         }
@@ -165,14 +165,13 @@ struct DogProfilesView: View {
                 .foregroundColor(.primary)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 16)
-                .background(Color.clear)
-                .glassEffect(.clear.tint(Color.clear).interactive())
                 .clipShape(RoundedRectangle(cornerRadius: 25))
             }
+            .buttonStyle(.glassProminent)
+            .tint(.purple.opacity(0.8))
+
         }
         .padding(40)
-        .background(Color.clear)
-        .glassEffect(.clear.tint(Color.clear).interactive())
         .clipShape(RoundedRectangle(cornerRadius: 30))
     }
     

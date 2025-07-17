@@ -8,7 +8,7 @@ struct AddDogView: View {
     @EnvironmentObject private var locationManager: LocationManager
     
     @State private var name: String = ""
-    @State private var selectedBreed: DogBreed = .labrador
+    @State private var selectedBreed: DogBreed = .cockapoo
     @State private var age: Int = 1
     @State private var interestText: String = ""
     @State private var interests: [String] = []

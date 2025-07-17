@@ -48,13 +48,52 @@ struct DogPhotoView: View {
     var body: some View {
         GeometryReader { geometry in
             
-            if let uiImage = UIImage(named: photoName) {
+            // Check if photoName is a Supabase backend URL
+            if photoName.hasPrefix("https://") && photoName.contains("supabase.co") {
+                // Load from backend URL using AsyncImage
+                AsyncImage(url: URL(string: photoName)) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .clipped()
+                    case .failure(_):
+                        // Error loading from backend
+                        ZStack {
+                            Color.red.opacity(0.1)
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.red)
+                                .font(.largeTitle)
+                        }
+                    case .empty:
+                        // Loading placeholder
+                        ZStack {
+                            Color.gray.opacity(0.1)
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .scaleEffect(0.8)
+                        }
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                .onAppear {
+                    print("📸 Loading backend photo: \(photoName)")
+                }
+            } else if let uiImage = UIImage(named: photoName) {
+                // Load from asset catalog (for sample dogs like "dog_Max")
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFit()
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .clipped()
+                .onAppear {
+                    print("📸 Loading asset photo: \(photoName)")
+                }
             } else {
+                // Fallback placeholder
                 ZStack {
                     Color.clear
                     Image(systemName: "photo")
@@ -62,6 +101,9 @@ struct DogPhotoView: View {
                         .scaledToFit()
                         .font(.largeTitle)
                         .foregroundColor(.gray.opacity(0.6))
+                }
+                .onAppear {
+                    print("📸 Fallback placeholder for: \(photoName)")
                 }
             }
         }

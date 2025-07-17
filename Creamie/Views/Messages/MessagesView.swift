@@ -33,8 +33,8 @@ struct MessagesView: View {
                     }
                 }
             }
-            .navigationTitle("Messages")
-            .listStyle(PlainListStyle())
+            .navigationBarTitle("Messages")
+            .listStyle(.insetGrouped)
             .navigationDestination(for: Chat.self) { chat in
                 NewFigmaChatView(chatViewModel: chatViewModel, chat: chat)
             }

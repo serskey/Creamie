@@ -12,8 +12,7 @@ struct SplashView: View {
             // Background gradient
             LinearGradient(
                 gradient: Gradient(colors: [
-                    Color.blue.opacity(0.8),
-                    Color.purple.opacity(0.6),
+                    Color.purple.opacity(0.8),
                     Color.pink.opacity(0.4)
                 ]),
                 startPoint: .topLeading,
@@ -23,16 +22,16 @@ struct SplashView: View {
             
             VStack(spacing: 30) {
                 ZStack {
-                    // Pulsing circles behind the icon
-                    if showingPulse {
-                        ForEach(0..<3) { index in
-                            Circle()
-                                .stroke(Color.white.opacity(0.3), lineWidth: 2)
-                                .scaleEffect(pulseScale + Double(index) * 0.3)
-                                .opacity(1.0 - (pulseScale - 1.0))
-                        }
-                    }
-                    
+//                    // Pulsing circles behind the icon
+//                    if showingPulse {
+//                        ForEach(0..<3) { index in
+//                            Circle()
+//                                .stroke(Color.white.opacity(0.3), lineWidth: 2)
+//                                .scaleEffect(pulseScale + Double(index) * 0.3)
+//                                .opacity(1.0 - (pulseScale - 1.0))
+//                        }
+//                    }
+//                    
                     // Splash photo
                     Image("Splash")
                         .resizable()
@@ -53,22 +52,22 @@ struct SplashView: View {
                     .opacity(opacity)
                     .scaleEffect(scale)
                 
-                // Loading indicator
-                HStack(spacing: 8) {
-                    ForEach(0..<3) { index in
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 8, height: 8)
-                            .scaleEffect(showingPulse ? 1.0 : 0.5)
-                            .animation(
-                                Animation.easeInOut(duration: 0.6)
-                                    .repeatForever()
-                                    .delay(Double(index) * 0.2),
-                                value: showingPulse
-                            )
-                    }
-                }
-                .opacity(opacity)
+//                // Loading indicator
+//                HStack(spacing: 8) {
+//                    ForEach(0..<3) { index in
+//                        Circle()
+//                            .fill(Color.white)
+//                            .frame(width: 8, height: 8)
+//                            .scaleEffect(showingPulse ? 1.0 : 0.5)
+//                            .animation(
+//                                Animation.easeInOut(duration: 0.6)
+//                                    .repeatForever()
+//                                    .delay(Double(index) * 0.2),
+//                                value: showingPulse
+//                            )
+//                    }
+//                }
+//                .opacity(opacity)
             }
         }
         .onAppear {
@@ -83,10 +82,10 @@ struct SplashView: View {
             opacity = 1.0
         }
         
-        // Rotation effect
-        withAnimation(.easeInOut(duration: 1.0).delay(0.3)) {
-            rotation = 360
-        }
+//        // Rotation effect
+//        withAnimation(.easeInOut(duration: 1.0).delay(0.3)) {
+//            rotation = 360
+//        }
         
         // Start pulsing effect
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
