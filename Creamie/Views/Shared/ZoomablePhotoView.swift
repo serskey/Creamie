@@ -135,17 +135,4 @@ struct ZoomablePhotoView: View {
         }
         .statusBarHidden()
     }
-    
-    private func loadImageFromDocuments(named name: String) -> UIImage? {
-        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsDirectory.appendingPathComponent("\(name).jpg")
-        
-        do {
-            let imageData = try Data(contentsOf: fileURL)
-            return UIImage(data: imageData)
-        } catch {
-            print("Error loading image \(name): \(error)")
-            return nil
-        }
-    }
 } 

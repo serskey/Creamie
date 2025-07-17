@@ -1,7 +1,6 @@
 import SwiftUI
 import MapKit
 import UIKit
-import SwiftUIPager
 
 struct DogProfilesView: View {
     @StateObject private var viewModel = DogProfileViewModel()
@@ -46,6 +45,10 @@ struct DogProfilesView: View {
         }
         .alert("Delete Dog?", isPresented: $viewModel.showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
+//            .buttonStyle(.glassProminent)
+//            .tint(.pink.opacity(0.8))
+            // TODO: Button color change not working
+             
             Button("Delete", role: .destructive) {
                 if let dogToDelete = viewModel.dogToDelete {
                     viewModel.deleteDog(dog: dogToDelete)
@@ -54,6 +57,10 @@ struct DogProfilesView: View {
                     }
                 }
             }
+//            .buttonStyle(.glassProminent)
+//            .tint(.purple.opacity(0.8))
+            // TODO: Button color change not working
+            
         } message: {
             if let dog = viewModel.dogToDelete {
                 Text("Are you sure you want to delete \(dog.name)? This action cannot be undone.")
@@ -90,7 +97,6 @@ struct DogProfilesView: View {
             }
         }
     }
-
     
     private var loadingView: some View {
         ZStack{
@@ -190,9 +196,16 @@ struct DogProfilesView: View {
                     ScrollViewReader { proxy in
                         ScrollView {
                             VStack(spacing: 0) {
+                                // dog basic info
                                 ExpandedLiquidGlassDogCard(dog: dog)
                                     .padding(.horizontal, 16)
-                                    .padding(.bottom, 140)
+                                    .padding(.bottom, 15)
+                                
+                                
+                                // action menu
+                                actionsMenu
+                                    .padding(.horizontal, 16)
+                                    .padding(.bottom, 100)
                             }
                         }
                     }
@@ -202,16 +215,13 @@ struct DogProfilesView: View {
                     .tag(index)
                 }
             }
-            .padding(.top, 32)
+            .padding(.top, 50)
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
             
-            // component 3
-            bottomToolbar
         }
         
     }
     
-    // component 1: dog picker
     private var dogPickerView: some View {
         Picker("Select Dog", selection: $currentDogIndex) {
             ForEach(Array(viewModel.dogs.enumerated()), id: \.element.id) { index, dog in
@@ -228,33 +238,18 @@ struct DogProfilesView: View {
         .padding(.vertical, 8)
     }
     
-    // component 2: main profile
     private struct ExpandedLiquidGlassDogCard: View {
         let dog: Dog
-        @State private var currentPage: Page = .first()
         
         var body: some View {
-            // dog photos
+            
             VStack(spacing: 16) {
+                // dog photos
                 if dog.photos.count > 1 {
-                    // SwiftUIPager
-                    VStack(spacing: 12) {
-                        Pager(page: currentPage,
-                              data: dog.photos,
-                              id: \.self) { photoName in
-                            DogPhotoView(photoName: photoName)
-                                .frame(height: 280)
-                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        }
-                        .interactive(rotation: true)
-                        .interactive(scale: 0.8)
-                        .itemSpacing(5)
-                        .itemAspectRatio(0.7, alignment: .center)
-                        .pageOffset(1.5)
+                    // Simple Native Carousel
+                    SimplePhotoCarousel(photos: dog.photos)
                         .frame(height: 280)
                         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        
-                    }
                 } else if let firstPhoto = dog.photos.first {
                     // Show the single photo normally
                     DogPhotoView(photoName: firstPhoto)
@@ -392,25 +387,10 @@ struct DogProfilesView: View {
         }
     }
     
-    // component 3
-    private var bottomToolbar: some View {
-        VStack {
-            Spacer()
-            
-            HStack {
-                leftActionsMenu
-                
-                Spacer()
-                
-                rightDeleteButton
-            }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 100)
-        }
-    }
-    
-    private var leftActionsMenu: some View {
+    private var actionsMenu: some View {
         Menu {
+            
+            // add dog
             Button {
                 viewModel.showingAddDog = true
             } label: {
@@ -418,6 +398,7 @@ struct DogProfilesView: View {
             }
             
             if !viewModel.dogs.isEmpty {
+                // edit current dog
                 Button {
                     if currentDogIndex < viewModel.dogs.count {
                         selectedDog = viewModel.dogs[currentDogIndex]
@@ -425,32 +406,28 @@ struct DogProfilesView: View {
                 } label: {
                     Label("Edit Dog", systemImage: "square.and.pencil")
                 }
+                
+                // delete current dog
+                Button {
+                    if !viewModel.dogs.isEmpty && currentDogIndex < viewModel.dogs.count {
+                        viewModel.confirmDeleteDog(dog: viewModel.dogs[currentDogIndex])
+                    }
+                } label: {
+                    Label("Delete Dog", systemImage: "trash")
+                }
+                .disabled(viewModel.dogs.isEmpty)
             }
+            
+            
+            
         } label: {
             
             Image(systemName: "list.bullet.below.rectangle")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundColor(.primary)
                 .padding(14)
-                .glassEffect(.clear.tint(Color.clear).interactive())
                 .clipShape(Circle())
         }
-    }
-    
-    private var rightDeleteButton: some View {
-        Button {
-            if !viewModel.dogs.isEmpty && currentDogIndex < viewModel.dogs.count {
-                viewModel.confirmDeleteDog(dog: viewModel.dogs[currentDogIndex])
-            }
-        } label: {
-            Image(systemName: "trash")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(.primary)
-                .padding(14)
-                .glassEffect(.clear.tint(Color.clear).interactive())
-                .clipShape(Circle())
-        }
-        .disabled(viewModel.dogs.isEmpty)
     }
     
     private struct HealthInfoItem {

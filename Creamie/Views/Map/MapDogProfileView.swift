@@ -70,6 +70,7 @@ struct MapDogProfileView: View {
                             
                             
                             // Action Buttons
+                            // Message Owner
                             VStack(spacing: 12) {
                                 Button(action: {
                                     // Find or create chat with this dog's owner
@@ -96,19 +97,25 @@ struct MapDogProfileView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                 }
                                 
-//                                Button(action: {
-//                                    // Add to favorites or schedule a playdate
-//                                }) {
-//                                    HStack {
-//                                        Image(systemName: "calendar.badge.plus")
-//                                        Text("Schedule Playdate")
-//                                    }
-//                                    .frame(maxWidth: .infinity)
-//                                    .padding()
-//                                    .background(Color.blue.opacity(0.1))
-//                                    .foregroundColor(.blue)
-//                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-//                                }
+                                // dog location
+                                Button(action: {
+                                    let coordinates = CLLocationCoordinate2D(latitude: dog.latitude, longitude: dog.longitude)
+                                    let url = URL(string: "maps://?saddr=&daddr=\(coordinates.latitude),\(coordinates.longitude)")
+                                    if let url = url, UIApplication.shared.canOpenURL(url) {
+                                        UIApplication.shared.open(url)
+                                    }
+                                }) {
+                                    
+                                    HStack {
+                                        Image(systemName: "location.fill")
+                                        Text("Find Me")
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .foregroundStyle(Color.primary)
+                                    .background(Color.purple.opacity(0.2))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
                             }
                         }
                         .padding(.horizontal)
