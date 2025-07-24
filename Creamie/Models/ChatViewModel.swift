@@ -1,101 +1,229 @@
 import SwiftUI
 import Combine
+import Supabase
 
+@MainActor
 class ChatViewModel: ObservableObject {
     @Published var chats: [Chat] = []
-    
+
+    private let currentUserId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
+    private let messagesTableName = "messages"
+    private var messageChannel: RealtimeChannelV2?
+    private let chatsTableName = "chats"
+
     init() {
-        // Initialize with sample chats for demo purposes
-        loadSampleChats()
-    }
-    
-    private func loadSampleChats() {
-        // Sample chat data - in production, this would come from a backend
-        chats = [
-            Chat(
-                otherUserName: "Sarah Johnson",
-                otherUserDogName: "Max",
-                otherUserDogPhoto: "dog_Max",
-                messages: [
-                    Message(text: "Hi! I saw Max on the map. He's adorable!", isFromCurrentUser: true, timestamp: Date().addingTimeInterval(-3600)),
-                    Message(text: "Thank you! Your Creamie is so cute too! Would love to set up a playdate", isFromCurrentUser: false, timestamp: Date().addingTimeInterval(-3000)),
-                    Message(text: "That would be great! When are you usually at the park?", isFromCurrentUser: true, timestamp: Date().addingTimeInterval(-1800))
-                ],
-                lastMessageDate: Date().addingTimeInterval(-1800)
-            )
-        ]
-    }
-    
-    // Find or create a chat with a specific dog owner
-    func findOrCreateChat(for dog: Dog) -> Chat {
-        // Check if chat already exists
-        if let existingChat = chats.first(where: { $0.otherUserDogName == dog.name }) {
-            return existingChat
+        Task {
+            await observeSocketStatus()
         }
+    }
+
+    private func observeSocketStatus() async {
+        for await status in supabase.realtimeV2.statusChange {
+            print("RealtimeV2 Socket status: \(status)")
+        }
+    }
+
+    func findOrCreateChat(for selectedDog: Dog) async -> Chat {
+        // fetch all conversations by userId
+        await fetchChatsByCurrentUserId(currentUserId: currentUserId)
         
-        // Create new chat
+        // existing conversation
+        if let existing = self.chats.first(where: { $0.otherDogId == selectedDog.id }) {
+            print("There is already a conversation \(existing.id) between user \(currentUserId) and dog \(selectedDog.id)")
+            return existing
+        }
+
+        // create new conversation
+        let chatId = UUID()
         let newChat = Chat(
-            otherUserName: dog.ownerName ?? "Dog Owner",
-            otherUserDogName: dog.name,
-            otherUserDogPhoto: dog.photos.first ?? "dog.fill",
-            messages: [],
-            lastMessageDate: Date()
+            id: chatId,
+            currentUserId: currentUserId,
+            otherDogId: selectedDog.id,
+            otherDogName: selectedDog.name,
+            otherDogAvatar: selectedDog.photos[0]
         )
-        
-        chats.append(newChat)
+            
+        // Insert new chat on Supabase
+        do {
+            try await supabase
+                .from(chatsTableName)
+                .insert([
+                    "id": newChat.id.uuidString,
+                    "current_user_id": newChat.currentUserId.uuidString,
+                    "other_dog_id": newChat.otherDogId.uuidString,
+                    "other_dog_name": newChat.otherDogName,
+                    "other_dog_avatar": newChat.otherDogAvatar
+                ])
+                .execute()
+            
+            // Only append locally after successful insert
+            chats.append(newChat)
+            print("Created new conversation \(chatId) between user \(currentUserId) and dog \(selectedDog.id)")
+        } catch {
+            print("❌ Failed to create chat \(newChat.id) on Supabase:", error)
+        }
+
         return newChat
     }
     
-    // Send a message in a chat
-    func sendMessage(_ text: String, in chat: Chat) {
-        let newMessage = Message(
-            text: text,
-            isFromCurrentUser: true,
-            timestamp: Date()
-        )
-        
-        if let index = chats.firstIndex(where: { $0.id == chat.id }) {
-            chats[index].messages.append(newMessage)
-            chats[index].lastMessageDate = Date()
+    func fetchChatsByCurrentUserId(currentUserId: UUID) async {
+        do {
+            let response = try await supabase
+                .from("chats")
+                .select("*")
+                .eq("current_user_id", value: currentUserId)
+                .execute()
             
-            // Sort chats by most recent first
-            chats.sort { $0.lastMessageDate > $1.lastMessageDate }
+            let data = response.data
             
-            // Simulate a reply after a delay (in production, this would come from backend)
-            simulateReply(to: chat)
+            let decoder = JSONDecoder()
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+            decoder.dateDecodingStrategy = .formatted(formatter)
+
+            let decoded = try decoder.decode([SupabaseChat].self, from: data)
+
+            let loadedChats = decoded.map { supaChat -> Chat in
+                return Chat(
+                    id: supaChat.id,
+                    currentUserId: supaChat.current_user_id,
+                    otherDogId: supaChat.other_dog_id,
+                    otherDogName: supaChat.other_dog_name,
+                    otherDogAvatar: supaChat.other_dog_avatar,
+                    messages: [],
+                    lastMessageDate: supaChat.inserted_at
+                )
+            }
+
+            self.chats = loadedChats
+            
+            print("📥 Loaded \(self.chats.count) conversations from user \(currentUserId)")
+        } catch {
+            print("❌ Failed to load chats: \(error)")
         }
     }
     
-    private func simulateReply(to chat: Chat) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-            let replies = [
-                "Sounds great! Looking forward to it 🐕",
-                "That works for me! See you there",
-                "Perfect! My dog loves making new friends",
-                "Awesome! What time works best for you?"
-            ]
+    func fetchMessagesByChatId(for chatId: UUID) async {
+        do {
+            let response = try await supabase
+                .from(messagesTableName)
+                .select("*")
+                .eq("chat_id", value: chatId.uuidString)
+                .order("created_at", ascending: true)
+                .execute()
             
-            let replyMessage = Message(
-                text: replies.randomElement()!,
-                isFromCurrentUser: false,
-                timestamp: Date()
-            )
+            let data = response.data
+            let decoder = JSONDecoder()
             
-            if let index = self?.chats.firstIndex(where: { $0.id == chat.id }) {
-                self?.chats[index].messages.append(replyMessage)
-                self?.chats[index].lastMessageDate = Date()
-                self?.chats.sort { $0.lastMessageDate > $1.lastMessageDate }
+            let decoded = try decoder.decode([SupabaseMessagePayload].self, from: data)
+            
+            let messages = decoded.map { supaMessage -> Message in
+                return Message(
+                    text: supaMessage.text,
+                    isFromCurrentUser: supaMessage.sender_id == currentUserId,
+                    timestamp: ISO8601DateFormatter().date(from: supaMessage.created_at) ?? Date()
+                )
+            }
+            
+            // Update the specific chat with loaded messages
+            if let index = self.chats.firstIndex(where: { $0.id == chatId }) {
+                self.chats[index].messages = messages
+            }
+            
+            print("📥 Loaded \(messages.count) messages for chat \(chatId)")
+        } catch {
+            print("❌ Failed to load messages for chat \(chatId): \(error)")
+        }
+    }
+
+    func sendMessage(_ text: String, in chat: Chat) {
+        let newMessage = Message(text: text,
+                                 isFromCurrentUser: true,
+                                 timestamp: Date())
+
+        // load in frontend
+        if let index = self.chats.firstIndex(where: { $0.id == chat.id }) {
+            if self.chats[index].messages == nil {
+                self.chats[index].messages = []
+            }
+            
+            self.chats[index].messages!.append(newMessage)
+            self.chats[index].lastMessageDate = newMessage.timestamp
+            self.chats.sort { $0.lastMessageDate > $1.lastMessageDate }
+        }
+        
+        // save to backend
+        let chatId = chat.id
+        let senderId = currentUserId
+        let messageId = UUID()
+
+        Task {
+            do {
+                _ = try await supabase
+                    .from(messagesTableName)
+                    .insert([
+                        "chat_id": chatId.uuidString,
+                        "sender_id": senderId.uuidString,
+                        "text": text
+                    ])
+                    .execute()
+                print("📤 Message \(messageId) sent for chat \(chatId)")
+            } catch {
+                print("❌ Failed to send message to chat \(chatId):", error)
             }
         }
     }
-    
-    // Delete a chat
+
     func deleteChat(_ chat: Chat) {
         chats.removeAll { $0.id == chat.id }
+        // TODO: Delete backend
     }
-    
-    // Delete chats by IDs (for batch deletion)
+
     func deleteChats(withIds chatIds: Set<UUID>) {
         chats.removeAll { chatIds.contains($0.id) }
+        // TODO: Delete backend
     }
-} 
+
+    func subscribeToMessages(for chatID: UUID) {
+        Task {
+            let channel = supabase.realtimeV2.channel("public:messages")
+            self.messageChannel = channel
+
+            Task {
+                for await insert in channel.postgresChange(
+                    InsertAction.self,
+                    schema: "public",
+                    table: "messages",
+                    filter: "chat_id=eq.\(chatID.uuidString)"
+                ) {
+                    do {
+                        let newRecord = try insert.decodeRecord(
+                            as: SupabaseMessagePayload.self,
+                            decoder: JSONDecoder()
+                        )
+
+                        let newMessage = Message(
+                            text: newRecord.text,
+                            isFromCurrentUser: newRecord.sender_id == currentUserId,
+                            timestamp: ISO8601DateFormatter().date(from: newRecord.created_at) ?? Date()
+                        )
+
+                        if let index = self.chats.firstIndex(where: { $0.id == chatID }) {
+                            if chats[index].messages == nil {
+                                chats[index].messages = []
+                            }
+                            
+                            self.chats[index].messages?.append(newMessage)
+                            self.chats[index].lastMessageDate = newMessage.timestamp
+                            self.chats.sort { $0.lastMessageDate > $1.lastMessageDate }
+                        }
+                    } catch {
+                        print("❌ Failed to decode message:", error)
+                    }
+                }
+            }
+
+            await channel.subscribe()
+        }
+    }
+}

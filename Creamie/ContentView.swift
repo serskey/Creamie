@@ -17,6 +17,7 @@ struct ContentView: View {
     @EnvironmentObject private var locationManager: LocationManager
     @EnvironmentObject private var chatViewModel: ChatViewModel
     @State private var showingLocationAlert = false
+    @State private var showTabBar = true
     
     var body: some View {
         Group {
@@ -37,13 +38,17 @@ struct ContentView: View {
             Group {
                 switch selectedTab {
                 case 0:
-                    MapView(selectedTab: $selectedTab, selectedChatId: $selectedChatId)
+                    MapView(selectedTab: $selectedTab,
+                            selectedChatId: $selectedChatId)
                         .id(mapViewId)
                 case 1:
                     DogProfilesView()
                         .id(dogProfileViewId)
                 case 2:
-                    MessagesView(chatViewModel: chatViewModel, selectedChatId: $selectedChatId)
+                    MessagesView(
+                        chatViewModel: chatViewModel,
+                        selectedChatId: $selectedChatId,
+                        showTabBar: $showTabBar)
                 case 3:
                     SettingsView()
                 default:
@@ -53,9 +58,11 @@ struct ContentView: View {
             }
             
             // Floating Tab Bar
-            VStack {
-                Spacer()
-                TabBar(selectedTab: $selectedTab)
+            if showTabBar {
+                VStack {
+                    Spacer()
+                    TabBar(selectedTab: $selectedTab)
+                }
             }
         }
         .onAppear {

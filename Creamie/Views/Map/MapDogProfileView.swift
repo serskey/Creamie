@@ -2,11 +2,13 @@ import SwiftUI
 import MapKit
 
 struct MapDogProfileView: View {
-    let dog: Dog
+    let selectedDog: Dog
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var chatViewModel: ChatViewModel
     @Binding var selectedTab: Int
     @Binding var selectedChatId: UUID?
+    
+    private let currentUserId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
     
     var body: some View {
         VStack(spacing: 0) {
@@ -19,7 +21,7 @@ struct MapDogProfileView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         // Header with photo - clean and embedded
-                        PhotoGalleryView(photoNames: dog.photos)
+                        PhotoGalleryView(photoNames: selectedDog.photos)
                             .frame(height: 240)
                             .clipShape(RoundedRectangle(cornerRadius: 20))
                             .padding(.horizontal, 16)
@@ -28,16 +30,16 @@ struct MapDogProfileView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             // Basic Info
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(dog.name)
+                                Text(selectedDog.name)
                                     .font(.title2.bold())
                                 
-                                Text("\(dog.breed.rawValue) · \(dog.age) years old")
+                                Text("\(selectedDog.breed.rawValue) · \(selectedDog.age) years old")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
                             
                             // Interests Section
-                            if let interests = dog.interests, !interests.isEmpty {
+                            if let interests = selectedDog.interests, !interests.isEmpty {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("Interests")
                                         .font(.headline)
@@ -57,7 +59,7 @@ struct MapDogProfileView: View {
                             }
                             
                             // About Me Section
-                            if let aboutMe = dog.aboutMe, !aboutMe.isEmpty {
+                            if let aboutMe = selectedDog.aboutMe, !aboutMe.isEmpty {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("About Me")
                                         .font(.headline)
@@ -68,61 +70,57 @@ struct MapDogProfileView: View {
                                 }
                             }
                             
-                            
-                            // Action Buttons
-                            // Message Owner
-                            VStack(spacing: 12) {
-                                Button(action: {
-                                    // Find or create chat with this dog's owner
-                                    let chat = chatViewModel.findOrCreateChat(for: dog)
-                                    
-                                    // Set the selected chat ID
-                                    selectedChatId = chat.id
-                                    
-                                    // Dismiss the sheet
-                                    dismiss()
-                                    
-                                    // Navigate to Messages tab
-                                    selectedTab = 2
-                                }) {
-                                    
-                                    HStack {
-                                        Image(systemName: "message.fill")
-                                        Text("Message Owner")
+                            // Action Buttons - Message Owner
+                            if currentUserId != selectedDog.ownerId {
+                                VStack(spacing: 12) {
+                                    Button(action: {
+                                        Task {
+                                            let chat = await chatViewModel.findOrCreateChat(for: selectedDog)
+                                            selectedTab = 2
+                                            dismiss()
+                                            selectedChatId = chat.id
+                                        }
+                                    }) {
+                                        
+                                        HStack {
+                                            Image(systemName: "message.fill")
+                                            Text("Message Owner")
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .foregroundStyle(Color.primary)
+                                        .background(Color.purple.opacity(0.2))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
                                     }
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .foregroundStyle(Color.primary)
-                                    .background(Color.purple.opacity(0.2))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                                
-                                // dog location
-                                Button(action: {
-                                    let coordinates = CLLocationCoordinate2D(latitude: dog.latitude, longitude: dog.longitude)
-                                    let url = URL(string: "maps://?saddr=&daddr=\(coordinates.latitude),\(coordinates.longitude)")
-                                    if let url = url, UIApplication.shared.canOpenURL(url) {
-                                        UIApplication.shared.open(url)
-                                    }
-                                }) {
                                     
-                                    HStack {
-                                        Image(systemName: "location.fill")
-                                        Text("Find Me")
+                                    // Action Buttons - Navigate to dog location
+                                    Button(action: {
+                                        let coordinates = CLLocationCoordinate2D(latitude: selectedDog.latitude, longitude: selectedDog.longitude)
+                                        let url = URL(string: "maps://?saddr=&daddr=\(coordinates.latitude),\(coordinates.longitude)")
+                                        if let url = url, UIApplication.shared.canOpenURL(url) {
+                                            UIApplication.shared.open(url)
+                                        }
+                                    }) {
+                                        
+                                        HStack {
+                                            Image(systemName: "location.fill")
+                                            Text("Find Me")
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .foregroundStyle(Color.primary)
+                                        .background(Color.purple.opacity(0.2))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
                                     }
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .foregroundStyle(Color.primary)
-                                    .background(Color.purple.opacity(0.2))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                                 }
                             }
+                            
                         }
                         .padding(.horizontal)
                     }
-                    .padding(.bottom, 20) // Add bottom padding for better spacing
+                    .padding(.bottom, 20)
                 }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity) // Ensure full frame usage
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

@@ -5,7 +5,7 @@ struct SettingsView: View {
     @State private var notificationsEnabled = true
     @State private var showOnMap = true
     @State private var autoAcceptPlaydates = false
-    @State private var shareLocation = true
+    @State private var shareStatus = true
     @State private var showingAbout = false
     @State private var showingPrivacyPolicy = false
     @State private var showingTerms = false
@@ -13,6 +13,7 @@ struct SettingsView: View {
     
     var body: some View {
         NavigationStack {
+            
             List {
                 // Profile Section
                 Section {
@@ -100,9 +101,9 @@ struct SettingsView: View {
                         Image(systemName: "eye.slash.fill")
                             .foregroundColor(.purple)
                             .frame(width: 24)
-                        Text("Share Location with Others")
+                        Text("Display Dog Online Status")
                         Spacer()
-                        Toggle("", isOn: $shareLocation)
+                        Toggle("", isOn: $shareStatus)
                     }
                     
                     NavigationLink(destination: BlockedUsersView()) {
@@ -202,7 +203,10 @@ struct SettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Settings")
+            .scrollContentBackground(.hidden)
+            .listStyle(.insetGrouped)
+//            .navigationTitle("Settings")
+            
         }
         .sheet(isPresented: $showingAbout) {
             AboutView()

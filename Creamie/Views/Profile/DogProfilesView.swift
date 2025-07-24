@@ -11,6 +11,7 @@ struct DogProfilesView: View {
     
     private let locationService = DogLocationService.shared
     
+    // TODO: dogs are listed in random sequence
     var body: some View {
         ZStack {
             // background cartoon icon based on breeds
@@ -146,7 +147,7 @@ struct DogProfilesView: View {
         VStack(spacing: 30) {
             Image(systemName: "dog.circle")
                 .font(.system(size: 80))
-                .foregroundColor(.primary.opacity(0.7))
+                .foregroundColor(Color.purple)
             
             VStack(spacing: 12) {
                 Text("No Dogs Yet!")

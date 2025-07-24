@@ -110,6 +110,22 @@ struct DogPhotoView: View {
     }
 }
 
+struct AcatarView: View {
+    let photoName: String
+    
+    var body: some View {
+        AsyncImage(url: URL(string: photoName)) { image in
+            image
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .clipShape(Circle())
+                .frame(width: 50, height: 50)
+        } placeholder: {
+            ProgressView()
+        }
+    }
+}
+
 struct FullScreenPhotoView: View {
     let photoNames: [String]
     @State private var currentIndex: Int

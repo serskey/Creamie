@@ -8,47 +8,7 @@
 import SwiftUI
 import CoreLocation
 import Combine
-
-//class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
-//    private let locationManager = CLLocationManager()
-//    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
-//    
-//    override init() {
-//        super.init()
-//        locationManager.delegate = self
-//        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-//        // Get initial authorization status
-//        authorizationStatus = locationManager.authorizationStatus
-//        print("LocationManager init - Authorization status: \(authorizationStatus.rawValue)")
-//        
-//        // Check if Info.plist has required keys
-//        if let _ = Bundle.main.object(forInfoDictionaryKey: "NSLocationWhenInUseUsageDescription") {
-//            print("✅ NSLocationWhenInUseUsageDescription is present in Info.plist")
-//        } else {
-//            print("❌ NSLocationWhenInUseUsageDescription is MISSING from Info.plist")
-//            print("⚠️ Location permission dialog will NOT appear without this key!")
-//        }
-//    }
-//    
-//    func requestPermission() {
-//        print("Requesting location permission...")
-//        print("Current authorization status before request: \(locationManager.authorizationStatus.rawValue)")
-//        
-//        // Check if we can request authorization
-//        if locationManager.authorizationStatus == .notDetermined {
-//            print("Status is notDetermined, requesting authorization...")
-//            locationManager.requestWhenInUseAuthorization()
-//        } else {
-//            print("Cannot request - status is already: \(locationManager.authorizationStatus.rawValue)")
-//            print("Status meanings: 0=notDetermined, 1=restricted, 2=denied, 3=authorizedAlways, 4=authorizedWhenInUse")
-//        }
-//    }
-//    
-//    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-//        authorizationStatus = manager.authorizationStatus
-//        print("Authorization status changed to: \(authorizationStatus.rawValue)")
-//    }
-//}
+import Supabase
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let locationManager = CLLocationManager()
@@ -147,6 +107,9 @@ struct CreamieApp: App {
             ContentView()
                 .environmentObject(locationManager)
                 .environmentObject(chatViewModel)
+                .task {
+                    await supabase.realtimeV2.connect()
+                }
         }
     }
 }

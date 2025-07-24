@@ -17,9 +17,10 @@ struct FilterView: View {
                     }) {
                         HStack {
                             Image(systemName: selectedBreeds.count == DogBreed.allCases.count ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(selectedBreeds.count == DogBreed.allCases.count ? .blue : .gray)
+                                .foregroundStyle(selectedBreeds.count == DogBreed.allCases.count ? Color.pink : Color.purple)
                             Text(selectedBreeds.count == DogBreed.allCases.count ? "Deselect All" : "Select All")
                                 .font(.headline)
+                                .foregroundColor(Color.pink)
                             Spacer()
                         }
                         .padding(.vertical, 4)
@@ -31,7 +32,7 @@ struct FilterView: View {
                     ForEach(DogBreed.sortedBreeds, id: \.self) { breed in
                         HStack {
                             Image(systemName: selectedBreeds.contains(breed) ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(selectedBreeds.contains(breed) ? .blue : .gray)
+                                .foregroundStyle(selectedBreeds.contains(breed) ? Color.pink : Color.purple)
                             Text(breed.rawValue)
                                 .font(.body)
                             Spacer()

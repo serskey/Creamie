@@ -29,7 +29,7 @@ struct TabBar: View {
                 isSelected: selectedTab == 2,
                 badgeCount: chatViewModel.chats.reduce(0) { count, chat in
                     // Count unread messages (for demo, we'll just use 1 if there are any messages)
-                    return count + (chat.messages.isEmpty ? 0 : 1)
+                    return count + (chat.safeMessages.isEmpty ? 0 : 1)
                 },
                 action: { selectedTab = 2 }
             )

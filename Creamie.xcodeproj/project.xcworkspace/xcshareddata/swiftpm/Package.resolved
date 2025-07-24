@@ -1,13 +1,13 @@
 {
-  "originHash" : "9a753086199b66f53d345c8b588bf17be734e15647d5e7b96a5069b2375201f8",
+  "originHash" : "ccc727310637079b7355ccf59e7d153c26677020c1a43e177b78cc9df7963c0f",
   "pins" : [
     {
       "identity" : "supabase-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/supabase-community/supabase-swift.git",
+      "location" : "https://github.com/supabase/supabase-swift.git",
       "state" : {
-        "revision" : "2eac6294b3e8fc08bfcc54ebdd614fd167f4f6ef",
-        "version" : "2.30.1"
+        "revision" : "8ac8c4a3d355eb833917cc387d8f5f13ca55dbb4",
+        "version" : "2.30.2"
       }
     },
     {
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "e8d6eba1fef23ae5b359c46b03f7d94be2f41fed",
-        "version" : "3.12.3"
+        "revision" : "84b1d494118d63629a785230135f82991f02329e",
+        "version" : "3.13.2"
       }
     },
     {
@@ -56,21 +56,12 @@
       }
     },
     {
-      "identity" : "swiftuipager",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/fermoya/SwiftUIPager",
-      "state" : {
-        "branch" : "main",
-        "revision" : "232675d4a401dbfea81be7cafdbfb8ab7e4844ac"
-      }
-    },
-    {
       "identity" : "xctest-dynamic-overlay",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/xctest-dynamic-overlay",
       "state" : {
-        "revision" : "39de59b2d47f7ef3ca88a039dff3084688fe27f4",
-        "version" : "1.5.2"
+        "revision" : "23e3442166b5122f73f9e3e622cd1e4bafeab3b7",
+        "version" : "1.6.0"
       }
     }
   ],

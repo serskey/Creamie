@@ -39,16 +39,20 @@ struct MapView: View {
     var body: some View {
         ZStack {
             mapContent
-            mapOverlay
+            if hasLocationPermission {
+                mapOverlay
+            }
         }
         .sheet(isPresented: $showingFilters) {
             FilterView(selectedBreeds: $selectedBreeds)
                 .presentationDetents([.medium])
         }
         .sheet(item: $selectedDog) { dog in
-            MapDogProfileView(dog: dog, selectedTab: $selectedTab, selectedChatId: $selectedChatId)
-                .presentationDetents([.medium])
-                .presentationBackgroundInteraction(.enabled)
+            MapDogProfileView(selectedDog: dog,
+                              selectedTab: $selectedTab,
+                              selectedChatId: $selectedChatId)
+            .presentationDetents([.medium])
+            .presentationBackgroundInteraction(.enabled)
         }
         .onAppear {
             setupInitialState()
@@ -73,24 +77,24 @@ private extension MapView {
     }
     
     var mapWithAnnotations: some View {
-                    Map(position: $position, selection: $selectedDog) {
+        Map(position: $position, selection: $selectedDog) {
             // User location marker
-                        if let userLocation = locationManager.userLocation {
-                            Annotation("You", coordinate: userLocation.coordinate) {
-                                UserLocationMarker()
-                            }
-                        }
-                        
+            if let userLocation = locationManager.userLocation {
+                Annotation("You", coordinate: userLocation.coordinate) {
+                    UserLocationMarker()
+                }
+            }
+            
             // Dog markers
-                        ForEach(filteredDogs) { dog in
+            ForEach(filteredDogs) { dog in
                 Annotation(dog.name, coordinate: CLLocationCoordinate2D(latitude: dog.latitude, longitude: dog.longitude)) {
-                                DogMarker(dog: dog)
-                            }
-                            .tag(dog)
-                        }
-                    }
-                    .mapStyle(.standard)
-                    .mapControlVisibility(.hidden)
+                    DogMarker(dog: dog)
+                }
+                .tag(dog)
+            }
+        }
+        .mapStyle(.standard)
+        .mapControlVisibility(.hidden)
         .onMapCameraChange { context in
             handleCameraChange(context)
         }
@@ -152,7 +156,7 @@ private extension MapView {
                         searchText = ""
                     }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
+                            .foregroundColor(.pink)
                             .font(.system(size: 14))
                     }
                 }
@@ -204,9 +208,7 @@ private extension MapView {
         guard let _ = newLocation,
               viewModel.isInitialLoad else { return }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            viewModel.fetchNearbyDogs()
-        }
+        viewModel.fetchNearbyDogs()
     }
     
     func handleCameraChange(_ context: MapCameraUpdateContext) {
@@ -273,7 +275,6 @@ struct LocationPermissionRequestView: View {
     }
 }
 
-// TODO: remove searchFilterBar from the top
 struct LocationPermissionDeniedView: View {
     var body: some View {
         VStack(spacing: 20) {

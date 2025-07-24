@@ -3,9 +3,13 @@ import SwiftUI
 struct MessagesView: View {
     @ObservedObject var chatViewModel: ChatViewModel
     @Binding var selectedChatId: UUID?
+    @Binding var showTabBar: Bool
     @State private var navigationPath = NavigationPath()
     @State private var chatToDelete: Chat?
     @State private var showingDeleteConfirmation = false
+    @State private var animate = false
+    
+    private let currentUserId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -18,52 +22,88 @@ struct MessagesView: View {
                     }
                     .listRowSeparator(.hidden)
                 } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: "pawprint.fill")
+                            .scaleEffect(animate ? 1.5 : 1.0)
+                            .foregroundColor(.purple)
+                        Text("Messages")
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                    }
+                    .frame(width: 1000, height: 10)
+                    .onAppear { animate = true }
+                    
                     ForEach(chatViewModel.chats) { chat in
-                        NavigationLink(value: chat) {
-                            ChatRow(chat: chat)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                chatToDelete = chat
-                                showingDeleteConfirmation = true
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                        ChatRow(chat: chat)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                navigationPath.append(chat)
                             }
-                        }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    chatToDelete = chat
+                                    showingDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                     }
                 }
             }
-            .navigationBarTitle("Messages")
+            .onAppear {
+                Task {
+                    await chatViewModel.fetchChatsByCurrentUserId(currentUserId: currentUserId)
+                    
+                    if let chatId = selectedChatId,
+                       let chat = chatViewModel.chats.first(where: { $0.id == chatId }) {
+                        navigationPath.append(chat)
+                        selectedChatId = nil
+                    }
+                }
+            }
+            .onChange(of: selectedChatId) { oldValue, newValue in
+                if let chatId = newValue,
+                   let chat = chatViewModel.chats.first(where: { $0.id == chatId }) {
+                    navigationPath.append(chat)
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        selectedChatId = nil
+                    }
+                } else if newValue != nil {
+                    print("❌ Chat not found in chats array - chats count: \(chatViewModel.chats.count)")
+                }
+            }
+            .onChange(of: navigationPath) { oldPath, newPath in
+                // Hide tab bar when navigating to chat, show when back to messages list
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showTabBar = newPath.isEmpty
+                }
+            }
+            .alert("Delete Conversation", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    chatToDelete = nil
+                }
+                Button("Delete", role: .destructive) {
+                    if let chat = chatToDelete {
+                        withAnimation {
+                            chatViewModel.deleteChat(chat)
+                        }
+                    }
+                    chatToDelete = nil
+                }
+            } message: {
+                if let chat = chatToDelete {
+                    Text("Are you sure you want to delete your conversation with \(chat.otherDogName)'s owner? This action cannot be undone.")
+                }
+            }
             .listStyle(.insetGrouped)
             .navigationDestination(for: Chat.self) { chat in
-                NewFigmaChatView(chatViewModel: chatViewModel, chat: chat)
-            }
-        }
-        .onChange(of: selectedChatId) { oldValue, newValue in
-            if let chatId = newValue,
-               let chat = chatViewModel.chats.first(where: { $0.id == chatId }) {
-                navigationPath.append(chat)
-                // Reset the selectedChatId after navigation
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    selectedChatId = nil
-                }
-            }
-        }
-        .alert("Delete Conversation", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {
-                chatToDelete = nil
-            }
-            Button("Delete", role: .destructive) {
-                if let chat = chatToDelete {
-                    withAnimation {
-                        chatViewModel.deleteChat(chat)
-                    }
-                }
-                chatToDelete = nil
-            }
-        } message: {
-            if let chat = chatToDelete {
-                Text("Are you sure you want to delete your conversation with \(chat.otherUserDogName)'s owner? This action cannot be undone.")
+                ChatView(
+                    showTabBar: $showTabBar,
+                    chatViewModel: chatViewModel,
+                    selectedChatId: $selectedChatId,
+                    chatId: chat.id
+                )
             }
         }
     }
@@ -74,17 +114,12 @@ struct ChatRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Dog photo
-            Image(chat.otherUserDogPhoto)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 50, height: 50)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            
+            AcatarView(photoName: chat.otherDogAvatar)
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(chat.otherUserDogName)
+                    Text(chat.otherDogName)
                         .font(.headline)
                     Spacer()
                     Text(chat.lastMessageDate, style: .time)
@@ -101,7 +136,3 @@ struct ChatRow: View {
         .padding(.vertical, 4)
     }
 }
-
-#Preview {
-    MessagesView(chatViewModel: ChatViewModel(), selectedChatId: .constant(nil))
-} 

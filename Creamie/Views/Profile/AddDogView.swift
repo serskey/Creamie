@@ -245,6 +245,7 @@ struct AddDogView: View {
     }
     
     private func deletePhoto(at index: Int) {
+        // TODO: right now it removes all photos not just one
         selectedItems[index] = nil
         selectedImages[index] = nil
     }
