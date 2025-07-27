@@ -84,7 +84,9 @@ struct MapDogProfileView: View {
                                         
                                         HStack {
                                             Image(systemName: "message.fill")
+                                                .foregroundColor(Color.pink)
                                             Text("Message Owner")
+                                                .foregroundColor(Color.pink)
                                         }
                                         .frame(maxWidth: .infinity)
                                         .padding()
@@ -104,7 +106,9 @@ struct MapDogProfileView: View {
                                         
                                         HStack {
                                             Image(systemName: "location.fill")
+                                                .foregroundColor(Color.pink)
                                             Text("Find Me")
+                                                .foregroundColor(Color.pink)
                                         }
                                         .frame(maxWidth: .infinity)
                                         .padding()

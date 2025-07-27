@@ -187,7 +187,7 @@ struct AddDogView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .navigationTitle("Add New Dog")
+//            .navigationTitle("Add New Dog")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

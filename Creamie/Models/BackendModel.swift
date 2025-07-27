@@ -7,6 +7,23 @@
 
 import Foundation
 
+struct UpdateDogRequest: Codable {
+    let name: String?
+    let breed: String?
+    let age: Int?
+    let interests: [String]?
+    let location: Location?
+    let aboutMe: String?
+    let ownerName: String?
+}
+
+struct DogsResponse: Codable {
+    let dogs: [Dog]
+    let totalCount: Int
+    let page: Int
+    let pageSize: Int
+}
+
 struct AddDogRequest: Codable {
     let name: String
     let breed: String
@@ -59,4 +76,16 @@ struct UploadDogPhotoResponse: Codable {
     let dogId: UUID
     let imageUrl: String
     let photos: [String]
+}
+
+struct UpdateDogOnlineStatusRequest: Codable {
+    let isOnline: Bool
+    let dogId: UUID?
+    let ownerId: UUID?
+}
+
+struct UpdateDogOnlineStatusResponse: Codable {
+    let status: String
+    let updatedCount: Int
+    let message: String
 }

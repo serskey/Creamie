@@ -5,11 +5,14 @@ struct SettingsView: View {
     @State private var notificationsEnabled = true
     @State private var showOnMap = true
     @State private var autoAcceptPlaydates = false
-    @State private var shareStatus = true
     @State private var showingAbout = false
     @State private var showingPrivacyPolicy = false
     @State private var showingTerms = false
     @State private var showingLogoutAlert = false
+    @StateObject private var dogProfileViewModel = DogProfileViewModel()
+    @AppStorage("isOnline") private var isOnline = true
+    
+    private let currentUserId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
     
     var body: some View {
         NavigationStack {
@@ -58,14 +61,14 @@ struct SettingsView: View {
                         Toggle("", isOn: $notificationsEnabled)
                     }
                     
-                    HStack {
-                        Image(systemName: "map.fill")
-                            .foregroundColor(.green)
-                            .frame(width: 24)
-                        Text("Show My Dogs on Map")
-                        Spacer()
-                        Toggle("", isOn: $showOnMap)
-                    }
+//                    HStack {
+//                        Image(systemName: "map.fill")
+//                            .foregroundColor(.green)
+//                            .frame(width: 24)
+//                        Text("Show My Dogs on Map")
+//                        Spacer()
+//                        Toggle("", isOn: $showOnMap)
+//                    }
                     
                     HStack {
                         Image(systemName: "calendar.badge.checkmark")
@@ -101,9 +104,14 @@ struct SettingsView: View {
                         Image(systemName: "eye.slash.fill")
                             .foregroundColor(.purple)
                             .frame(width: 24)
-                        Text("Display Dog Online Status")
+                        Text("Show My Dogs on Map")
                         Spacer()
-                        Toggle("", isOn: $shareStatus)
+                        Toggle("", isOn: $isOnline)
+                            .onChange(of: isOnline) {
+                                Task {
+                                    await updateOnlineStatus(isOnline: isOnline)
+                                }
+                            }
                     }
                     
                     NavigationLink(destination: BlockedUsersView()) {
@@ -262,6 +270,11 @@ struct SettingsView: View {
         // - Clear stored data
         // - Navigate to login screen
     }
+    
+    private func updateOnlineStatus(isOnline: Bool) async {
+        await dogProfileViewModel.updateDogOnlineStatus(isOnline: isOnline,
+                                               userId: currentUserId)
+    }
 }
 
 // MARK: - Supporting Views
@@ -335,6 +348,8 @@ struct BlockedUsersView: View {
 }
 
 struct AboutView: View {
+    @Environment(\.dismiss) private var dismiss
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -374,7 +389,7 @@ struct AboutView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        // Dismiss
+                        dismiss()
                     }
                 }
             }
@@ -399,6 +414,8 @@ struct FeatureRow: View {
 }
 
 struct PrivacyPolicyView: View {
+    @Environment(\.dismiss) private var dismiss
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -426,7 +443,7 @@ struct PrivacyPolicyView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        // Dismiss
+                        dismiss()
                     }
                 }
             }
@@ -435,6 +452,8 @@ struct PrivacyPolicyView: View {
 }
 
 struct TermsOfServiceView: View {
+    @Environment(\.dismiss) private var dismiss
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -462,7 +481,7 @@ struct TermsOfServiceView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        // Dismiss
+                        dismiss()
                     }
                 }
             }
@@ -487,4 +506,4 @@ struct PolicySection: View {
 #Preview {
     SettingsView()
         .environmentObject(LocationManager())
-} 
+}

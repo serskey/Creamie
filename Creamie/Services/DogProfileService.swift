@@ -2,23 +2,6 @@ import Foundation
 import CoreLocation
 import UIKit
 
-struct UpdateDogRequest: Codable {
-    let name: String?
-    let breed: String?
-    let age: Int?
-    let interests: [String]?
-    let location: Location?
-    let aboutMe: String?
-    let ownerName: String?
-}
-
-struct DogsResponse: Codable {
-    let dogs: [Dog]
-    let totalCount: Int
-    let page: Int
-    let pageSize: Int
-}
-
 // MARK: - Dog Profile Service
 class DogProfileService {
     static let shared = DogProfileService()
@@ -206,6 +189,21 @@ class DogProfileService {
         
         return response.dogs.map { $0 }
     }
+    
+    func updateDogOnlineStatus(request: UpdateDogOnlineStatusRequest) async throws -> UpdateDogOnlineStatusResponse {
+        
+        let response = try await apiService.request(
+            endpoint: "/dogs/update-online-status",
+            method: .POST,
+            body: request,
+            responseType: UpdateDogOnlineStatusResponse.self
+        )
+        
+        return response
+
+    }
+    
+    
 }
 
 // MARK: - Helper Extensions

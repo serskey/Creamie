@@ -209,6 +209,43 @@ class DogProfileViewModel: ObservableObject {
         }
     }
     
+    func updateDogOnlineStatus(isOnline: Bool, dogId: UUID? = nil, userId: UUID? = nil) async {
+        let updateDogOnlineStatusRequest = UpdateDogOnlineStatusRequest(
+            isOnline: isOnline,
+            dogId: dogId,
+            ownerId: userId
+        )
+        
+        do {
+            let response = try await dogProfileService.updateDogOnlineStatus(request: updateDogOnlineStatusRequest)
+            
+            
+            if response.status != "success" {
+                print("❌ Failed to update online status on backend")
+            }
+            
+            if let specificDogId = dogId {
+                if let index = dogs.firstIndex(where: { $0.id == specificDogId }) {
+                    dogs[index].isOnline = isOnline
+                    dogs[index].updatedAt = Date.now
+                }
+            } else {
+                for i in 0..<dogs.count {
+                    if dogs[i].ownerId == userId {
+                        dogs[i].isOnline = isOnline
+                        dogs[i].updatedAt = Date.now
+                    }
+                }
+            }
+            
+            let target = dogId != nil ? "dog \(dogId!.rawValue)" : "\(response.updatedCount) dogs of user \(userId!.rawValue)"
+            print("✅ Updated online status to \(isOnline) for \(target)")
+            
+        } catch {
+            print("❌ Failed to update online status: \(error)")
+        }
+    }
+        
 //    /// Save an image to the Documents directory with a specific filename
 //    /// - Parameters:
 //    ///   - image: The UIImage to save
