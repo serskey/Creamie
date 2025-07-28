@@ -19,6 +19,8 @@ class DogProfileViewModel: ObservableObject {
     // Photo storage
     private var photoCounter = 0
     
+    private let minPhotos = 1
+    
     func fetchUserDogs(userId: UUID) async {
         let getUserDogsRequest = GetUserDogsRequest(userId: userId)
         
@@ -28,16 +30,16 @@ class DogProfileViewModel: ObservableObject {
             
             // Debug: Print photo URLs to verify backend data
             for dog in response.dogs {
-                print("🐕 Dog \(dog.name) photos:")
+                print("📸 Dog \(dog.name) photos:")
                 for (index, photo) in dog.photos.enumerated() {
                     print("  Photo \(index + 1): \(photo)")
                 }
             }
             
-            print("Fetched \(response.totalCount) dogs from user \(userId)")
+            print("🐾 Fetched \(response.totalCount) dogs from user \(userId)")
         } catch {
             // TODO: Add error detail from backend
-            print("Failed to fetch user's dogs: \(error)")
+            print("❌ Failed to fetch user's dogs: \(error)")
             self.dogs = []
         }
     }
@@ -79,13 +81,13 @@ class DogProfileViewModel: ObservableObject {
                 
                 // Check if backend response indicates success
                 if let response = response, response.status.lowercased() == "success", let dogId = response.dogId {
-                    print("Successfully saved dog to backend: \(dogId)")
+                    print("🐾 Successfully saved dog to backend: \(dogId)")
                     
                     // Upload ALL photos - this must succeed for minimum photos requirement
                     photoNames = await uploadPhotos(photos, for: dogId)
                     
-                    // Check if we have the minimum required photos (2 minimum from UI validation)
-                    if photoNames.count >= 2 {
+                    // Check if we have the minimum required photos (1 minimum from UI validation)
+                    if photoNames.count >= minPhotos {
                         // SUCCESS: Both dog creation and photo upload succeeded
                         let newDog = Dog(
                             id: dogId,
@@ -112,8 +114,8 @@ class DogProfileViewModel: ObservableObject {
                         self.addDogSuccess = "\(name) has been successfully added with \(photoCount) photo(s)!"
                     } else {
                         // FAILURE: Photo upload failed - rollback dog creation
-                        print("Photo upload failed (\(photoNames.count)/\(photos.count) uploaded), rolling back dog creation")
-                        // TODO: Add backend API to delete the created dog
+                        print("❌ Photo upload failed (\(photoNames.count)/\(photos.count) uploaded), rolling back dog creation")
+                        // TODO: Add backend API to delete the created dog and delete uploaded photos
                         // await DogProfileService.shared.deleteDog(dogId: dogId)
                         
                         self.addDogError = "Failed to upload enough photos for \(name). At least 2 photos are required. Please try again."
@@ -125,8 +127,8 @@ class DogProfileViewModel: ObservableObject {
                 }
                 
             } catch {
-                print("Failed to save dog to backend: \(String(describing: response?.error))")
-                // Set specific error for add dog failures  
+                print("❌ Failed to save dog to backend: \(String(describing: response?.error))")
+                // Set specific error for add dog failures
                 self.addDogError = "Unable to save \(name). Please check your internet connection and try again."
             }
         }
@@ -158,7 +160,7 @@ class DogProfileViewModel: ObservableObject {
             
             dogs.remove(at: index)
             // TODO: In a real app, you would also delete from your backend/database
-            print("Deleted dog: \(dog.name)")
+            print("🗑️ Deleted dog: \(dog.name)")
         }
         dogToDelete = nil
     }
@@ -186,14 +188,14 @@ class DogProfileViewModel: ObservableObject {
                 photoNames.append(response.imageUrl)
                 
             } catch {
-                print("Failed to upload photo \(index + 1): \(error)")
+                print("❌ Failed to upload photo \(index + 1): \(error)")
                 // ALL-OR-NOTHING: If any photo fails, return empty array
                 // This ensures consistent user experience - dog only appears with all intended photos
                 return []
             }
         }
         
-        print("All \(photoNames.count) photos uploaded")
+        print("📤 All \(photoNames.count) photos uploaded")
         return photoNames
     }
     
@@ -203,9 +205,9 @@ class DogProfileViewModel: ObservableObject {
         
         do {
             try FileManager.default.removeItem(at: fileURL)
-            print("Deleted image at: \(fileURL.path)")
+            print("🗑️ Deleted image at: \(fileURL.path)")
         } catch {
-            print("Error deleting image: \(error)")
+            print("❌ Error deleting image: \(error)")
         }
     }
     

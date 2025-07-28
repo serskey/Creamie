@@ -19,15 +19,38 @@ struct ContentView: View {
     @State private var showingLocationAlert = false
     @State private var showTabBar = true
     
+    // Use single shared instances
+    @EnvironmentObject var authService: AuthenticationService
+    @StateObject private var authViewModel = AuthenticationViewModel()
+    
     var body: some View {
         Group {
             if isLoading {
                 SplashView()
                     .onAppear {
-                        startLoadingSequence()
+                        print("🔄 Showing SplashView")
+                    }
+            } else if !authService.isAuthenticated {
+                AuthenticationView(viewModel: authViewModel)
+                    .environmentObject(authService)
+                    .onAppear {
+                        print("🔄 Showing AuthenticationView")
                     }
             } else {
                 mainContent
+                    .onAppear {
+                        print("🔄 Showing mainContent - authenticated!")
+                    }
+            }
+        }
+        .onAppear {
+            startInitialLoadingSequence()
+        }
+        .onChange(of: authService.isAuthenticated) { oldValue, newValue in
+            print("🔄 ContentView: Authentication changed from \(oldValue) to \(newValue)")
+            // When user successfully authenticates, request location permission
+            if newValue && !oldValue {
+                locationManager.requestPermission()
             }
         }
     }
@@ -51,6 +74,7 @@ struct ContentView: View {
                         showTabBar: $showTabBar)
                 case 3:
                     SettingsView()
+                        .environmentObject(authService)
                 default:
                     MapView(selectedTab: $selectedTab, selectedChatId: $selectedChatId)
                         .id(mapViewId)
@@ -110,12 +134,10 @@ struct ContentView: View {
         }
     }
     
-    private func startLoadingSequence() {
-        // Request location permission during splash
-        locationManager.requestPermission()
+    private func startInitialLoadingSequence() {
         
-        // Minimum splash duration of 2.5 seconds for nice UX
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+        // Minimum splash duration of 2.0 seconds for nice UX
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             withAnimation(.easeInOut(duration: 0.5)) {
                 isLoading = false
             }

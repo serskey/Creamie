@@ -8,6 +8,7 @@ struct DogProfilesView: View {
     @State private var isPhotoZoomed: Bool = false
     @State private var showFullMap: Bool = false
     @State private var currentDogIndex: Int = 0
+    @EnvironmentObject var authService: AuthenticationService
     
     private let locationService = DogLocationService.shared
     
@@ -33,7 +34,7 @@ struct DogProfilesView: View {
         }
         .task {
             // TODO: change to real login user id
-            await viewModel.fetchUserDogs(userId: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!)
+            await viewModel.fetchUserDogs(userId: authService.currentUser!.id)
         }
         .onChange(of: viewModel.dogs) { _, newDogs in
             // Reset to first dog when dogs data changes
@@ -129,7 +130,7 @@ struct DogProfilesView: View {
             
             Button("Try Again") {
                 Task {
-                    await viewModel.fetchUserDogs(userId: UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!)
+                    await viewModel.fetchUserDogs(userId: authService.currentUser!.id)
                 }
             }
             .padding()

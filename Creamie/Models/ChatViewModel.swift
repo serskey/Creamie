@@ -6,10 +6,11 @@ import Supabase
 class ChatViewModel: ObservableObject {
     @Published var chats: [Chat] = []
 
-    private let currentUserId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
+    private let authService = AuthenticationService.shared
     private let messagesTableName = "messages"
     private var messageChannel: RealtimeChannelV2?
     private let chatsTableName = "chats"
+    
 
     init() {
         Task {
@@ -24,6 +25,7 @@ class ChatViewModel: ObservableObject {
     }
 
     func findOrCreateChat(for selectedDog: Dog) async -> Chat {
+        let currentUserId = authService.currentUser!.id
         // fetch all conversations by userId
         await fetchChatsByCurrentUserId(currentUserId: currentUserId)
         
@@ -67,6 +69,8 @@ class ChatViewModel: ObservableObject {
     }
     
     func fetchChatsByCurrentUserId(currentUserId: UUID) async {
+        let currentUserId = authService.currentUser!.id
+        
         do {
             let response = try await supabase
                 .from("chats")
@@ -104,6 +108,8 @@ class ChatViewModel: ObservableObject {
     }
     
     func fetchMessagesByChatId(for chatId: UUID) async {
+        let currentUserId = authService.currentUser!.id
+        
         do {
             let response = try await supabase
                 .from(messagesTableName)
@@ -137,6 +143,7 @@ class ChatViewModel: ObservableObject {
     }
 
     func sendMessage(_ text: String, in chat: Chat) {
+        let currentUserId = authService.currentUser!.id
         let newMessage = Message(text: text,
                                  isFromCurrentUser: true,
                                  timestamp: Date())
@@ -185,6 +192,8 @@ class ChatViewModel: ObservableObject {
     }
 
     func subscribeToMessages(for chatID: UUID) {
+        let currentUserId = authService.currentUser!.id
+        
         Task {
             let channel = supabase.realtimeV2.channel("public:messages")
             self.messageChannel = channel

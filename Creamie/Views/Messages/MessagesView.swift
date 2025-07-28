@@ -8,8 +8,7 @@ struct MessagesView: View {
     @State private var chatToDelete: Chat?
     @State private var showingDeleteConfirmation = false
     @State private var animate = false
-    
-    private let currentUserId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
+    @EnvironmentObject var authService: AuthenticationService
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -52,7 +51,7 @@ struct MessagesView: View {
             }
             .onAppear {
                 Task {
-                    await chatViewModel.fetchChatsByCurrentUserId(currentUserId: currentUserId)
+                    await chatViewModel.fetchChatsByCurrentUserId(currentUserId: authService.currentUser!.id)
                     
                     if let chatId = selectedChatId,
                        let chat = chatViewModel.chats.first(where: { $0.id == chatId }) {

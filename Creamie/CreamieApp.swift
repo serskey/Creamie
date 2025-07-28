@@ -34,7 +34,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func requestPermission() {
-        print("Requesting location permission...")
+        // Status meanings: 0=notDetermined, 1=restricted, 2=denied, 3=authorizedAlways, 4=authorizedWhenInUse
+        print("📍 Requesting location permission...")
         print("Current authorization status before request: \(locationManager.authorizationStatus.rawValue)")
         
         // Check if we can request authorization
@@ -43,7 +44,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             locationManager.requestWhenInUseAuthorization()
         } else {
             print("Cannot request - status is already: \(locationManager.authorizationStatus.rawValue)")
-            print("Status meanings: 0=notDetermined, 1=restricted, 2=denied, 3=authorizedAlways, 4=authorizedWhenInUse")
         }
     }
     
@@ -53,13 +53,13 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             return
         }
         
-        print("Starting location updates...")
+        print("🔄 Starting location updates...")
         isLocationUpdating = true
         locationManager.startUpdatingLocation()
     }
     
     func stopLocationUpdates() {
-        print("Stopping location updates...")
+        print("🛑 Stopping location updates...")
         isLocationUpdating = false
         locationManager.stopUpdatingLocation()
     }
@@ -69,7 +69,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         DispatchQueue.main.async {
             self.authorizationStatus = manager.authorizationStatus
-            print("Authorization status changed to: \(self.authorizationStatus.rawValue)")
+            print("🔄 Authorization status changed to: \(self.authorizationStatus.rawValue)")
             
             // Automatically start location updates when permission is granted
             if self.authorizationStatus == .authorizedWhenInUse || self.authorizationStatus == .authorizedAlways {
@@ -101,12 +101,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
 struct CreamieApp: App {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var chatViewModel = ChatViewModel()
+    @StateObject private var authService = AuthenticationService.shared
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(locationManager)
                 .environmentObject(chatViewModel)
+                .environmentObject(authService)
                 .task {
                     await supabase.realtimeV2.connect()
                 }

@@ -89,3 +89,28 @@ struct UpdateDogOnlineStatusResponse: Codable {
     let updatedCount: Int
     let message: String
 }
+
+struct LoginRequest: Codable {
+    let email: String
+    let password: String
+}
+
+struct SignUpRequest: Codable {
+    let email: String
+    let password: String
+    let name: String
+    let phoneNumber: String
+}
+
+struct UpdateProfileRequest: Codable {
+    let name: String
+    let phoneNumber: String
+    let photos: [String]?
+}
+
+struct AuthResponse: Codable {
+    let success: Bool
+    let message: String?
+    let user: User?
+    let token: String?
+}

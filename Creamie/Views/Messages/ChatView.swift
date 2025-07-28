@@ -13,6 +13,8 @@ struct ChatView: View {
     
     @State private var selectedDog: Dog?
     
+    @EnvironmentObject var authService: AuthenticationService
+    
     // Computed property to get the current chat from chatViewModel
     private var chat: Chat {
         return chatViewModel.chats.first(where: { $0.id == chatId }) ?? Chat.empty

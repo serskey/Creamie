@@ -6,6 +6,7 @@ struct AddDogView: View {
     @ObservedObject var viewModel: DogProfileViewModel
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var locationManager: LocationManager
+    @EnvironmentObject var authService: AuthenticationService
     
     @State private var name: String = ""
     @State private var selectedBreed: DogBreed = .cockapoo
@@ -18,18 +19,15 @@ struct AddDogView: View {
     @State private var interestToDelete: String = ""
     
     // Photo selection
-    @State private var selectedItems: [PhotosPickerItem?] = [nil, nil, nil, nil, nil]
-    @State private var selectedImages: [UIImage?] = [nil, nil, nil, nil, nil]
+    @State private var selectedItems: [PhotosPickerItem?] = [nil, nil, nil, nil, nil, nil]
+    @State private var selectedImages: [UIImage?] = [nil, nil, nil, nil, nil, nil]
     @State private var currentEditingIndex: Int? = nil
     
-    // Generate a unique owner ID for each new dog
-    private let ownerId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
-    
     // Maximum number of photos allowed
-    private let maxPhotos = 5
+    private let maxPhotos = 6
     
     // Minimum number of photos acquired
-    private let minPhotos = 2
+    private let minPhotos = 1
     
     // Computed property to get current location or default
     private var currentLocation: Location {
@@ -96,7 +94,7 @@ struct AddDogView: View {
                             HStack {
                                 Image(systemName: "info.circle")
                                     .foregroundColor(.orange)
-                                Text("Please add at least \(minPhotos) photos to continue")
+                                Text("Please add at least \(minPhotos) photo to continue")
                                     .font(.caption)
                                     .foregroundColor(.orange)
                             }
@@ -112,10 +110,12 @@ struct AddDogView: View {
                     
                     Picker("Breed", selection: $selectedBreed) {
                         ForEach(DogBreed.sortedBreeds, id: \.self) { breed in
-                            Text(breed.rawValue).tag(breed)
+                            Text(breed.rawValue)
+                                .foregroundColor(Color.primary)
+                                .tag(breed)
                         }
                     }
-                    .pickerStyle(MenuPickerStyle())
+                    .pickerStyle(.automatic)
                     
                     Stepper("Age: \(age) year\(age == 1 ? "" : "s")", value: $age, in: 1...50)
                 }
@@ -163,19 +163,10 @@ struct AddDogView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                Section(header: Text("Owner Information")) {
-                    TextField("Your name", text: $ownerName)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
-                    Text("This will be shown to other dog owners")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
                 Section(header: Text("Location")) {
                     HStack {
                         Image(systemName: "location.circle.fill")
-                            .foregroundColor(locationManager.userLocation != nil ? .blue : .orange)
+                            .foregroundColor(locationManager.userLocation != nil ? .purple : .orange)
                         Text(locationDisplayText)
                         Spacer()
                         Text("📍")
@@ -267,6 +258,7 @@ struct AddDogView: View {
         
         // Filter out nil images
         let validImages = selectedImages.compactMap { $0 }
+        let aboutMeString = aboutMe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : aboutMe.trimmingCharacters(in: .whitespacesAndNewlines)
         
         viewModel.addDog(
             name: trimmedName,
@@ -275,9 +267,10 @@ struct AddDogView: View {
             interests: interests,
             location: currentLocation,
             photos: validImages,
-            aboutMe: aboutMe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : aboutMe.trimmingCharacters(in: .whitespacesAndNewlines),
-            ownerName: ownerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : ownerName.trimmingCharacters(in: .whitespacesAndNewlines),
-            ownerId: ownerId,
+            aboutMe: aboutMeString,
+            ownerName: authService.currentUser!.name,
+//            ownerName: ownerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : ownerName.trimmingCharacters(in: .whitespacesAndNewlines),
+            ownerId: authService.currentUser!.id,
             // TODO: toggle button to set dog's online status upon their choose,
             // mention they can change the status in setting as well, or add a button on the "My dog" page to easily toggle
             // Hardcode to online for now
@@ -305,7 +298,7 @@ struct PhotoUploadBlock: View {
                     .background(Color(.systemBackground))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.blue, lineWidth: 2)
+                            .stroke(Color.purple, lineWidth: 2)
                     )
                     .onTapGesture {
                         onSelect()
@@ -324,19 +317,15 @@ struct PhotoUploadBlock: View {
                 VStack {
                     Image(systemName: "photo.badge.plus")
                         .font(.system(size: 30))
-                        .foregroundColor(.blue)
-                    
-                    Text("Photo \(index + 1)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Color.pink.opacity(0.3))
                 }
                 .frame(width: 100, height: 100)
-                .background(Color.gray.opacity(0.1))
+                .background(Color.purple.opacity(0.3))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                )
+//                .overlay(
+//                    RoundedRectangle(cornerRadius: 10)
+//                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+//                )
                 .onTapGesture {
                     onSelect()
                 }
@@ -362,8 +351,8 @@ struct InterestChip: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color.blue.opacity(0.1))
-        .foregroundColor(.blue)
+        .background(Color.purple.opacity(0.1))
+        .foregroundColor(.purple)
         .clipShape(Capsule())
     }
 }

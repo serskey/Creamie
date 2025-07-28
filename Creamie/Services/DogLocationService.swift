@@ -39,7 +39,7 @@ class DogLocationService: ObservableObject {
     
     /// Fetch nearby dogs from the server
     func fetchNearbyDogs(request: NearbyDogsRequest) async throws -> NearbyDogsResponse {
-        print("Fetching nearby dogs from backend...")
+        print("🔍 Fetching nearby dogs from backend...")
         let response = try await apiService.request(
             endpoint: "/dogs/nearby",
             method: .POST,
@@ -51,7 +51,7 @@ class DogLocationService: ObservableObject {
             self.nearbyDogs = response.dogs
         }
         
-        print("Fetched \(response.totalCount) nearby dogs from backend")
+        print("🐾 Fetched \(response.totalCount) nearby dogs from backend")
         return response
     }
     

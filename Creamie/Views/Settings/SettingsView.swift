@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject private var locationManager: LocationManager
+    @EnvironmentObject var authService: AuthenticationService
     @State private var notificationsEnabled = true
     @State private var showOnMap = true
     @State private var autoAcceptPlaydates = false
@@ -12,7 +13,6 @@ struct SettingsView: View {
     @StateObject private var dogProfileViewModel = DogProfileViewModel()
     @AppStorage("isOnline") private var isOnline = true
     
-    private let currentUserId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
     
     var body: some View {
         NavigationStack {
@@ -23,29 +23,23 @@ struct SettingsView: View {
                     HStack(spacing: 16) {
                         // Profile picture placeholder
                         Circle()
-                            .fill(Color.blue.opacity(0.2))
+                            .fill(Color.purple.opacity(0.3))
                             .frame(width: 60, height: 60)
                             .overlay {
                                 Image(systemName: "person.fill")
                                     .font(.title2)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.purple)
                             }
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("John Doe")
+                            Text(authService.currentUser?.name ?? "User")
                                 .font(.headline)
-                            Text("john.doe@example.com")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                                .lineLimit(1)
                         }
                         
                         Spacer()
                         
-                        NavigationLink(destination: EditProfileView()) {
-                            Text("Edit")
-                                .font(.subheadline)
-                                .foregroundColor(.blue)
-                        }
+                        NavigationLink(destination: EditProfileView()) {}
                     }
                     .padding(.vertical, 4)
                 }
@@ -70,14 +64,14 @@ struct SettingsView: View {
 //                        Toggle("", isOn: $showOnMap)
 //                    }
                     
-                    HStack {
-                        Image(systemName: "calendar.badge.checkmark")
-                            .foregroundColor(.blue)
-                            .frame(width: 24)
-                        Text("Auto-Accept Playdates")
-                        Spacer()
-                        Toggle("", isOn: $autoAcceptPlaydates)
-                    }
+//                    HStack {
+//                        Image(systemName: "calendar.badge.checkmark")
+//                            .foregroundColor(.blue)
+//                            .frame(width: 24)
+//                        Text("Auto-Accept Playdates")
+//                        Spacer()
+//                        Toggle("", isOn: $autoAcceptPlaydates)
+//                    }
                 }
                 
                 // Privacy & Security
@@ -100,19 +94,20 @@ struct SettingsView: View {
                         .foregroundColor(.blue)
                     }
                     
-                    HStack {
-                        Image(systemName: "eye.slash.fill")
-                            .foregroundColor(.purple)
-                            .frame(width: 24)
-                        Text("Show My Dogs on Map")
-                        Spacer()
-                        Toggle("", isOn: $isOnline)
-                            .onChange(of: isOnline) {
-                                Task {
-                                    await updateOnlineStatus(isOnline: isOnline)
-                                }
-                            }
-                    }
+//                    // Deprecate this for now since user can turn off in each dag profile card
+//                    HStack {
+//                        Image(systemName: "eye.slash.fill")
+//                            .foregroundColor(.purple)
+//                            .frame(width: 24)
+//                        Text("Show My Dogs on Map")
+//                        Spacer()
+//                        Toggle("", isOn: $isOnline)
+//                            .onChange(of: isOnline) {
+//                                Task {
+//                                    await updateOnlineStatus(isOnline: isOnline)
+//                                }
+//                            }
+//                    }
                     
                     NavigationLink(destination: BlockedUsersView()) {
                         HStack {
@@ -120,10 +115,6 @@ struct SettingsView: View {
                                 .foregroundColor(.red)
                                 .frame(width: 24)
                             Text("Blocked Users")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
                         }
                     }
                 }
@@ -213,7 +204,6 @@ struct SettingsView: View {
             }
             .scrollContentBackground(.hidden)
             .listStyle(.insetGrouped)
-//            .navigationTitle("Settings")
             
         }
         .sheet(isPresented: $showingAbout) {
@@ -228,7 +218,6 @@ struct SettingsView: View {
         .alert("Sign Out", isPresented: $showingLogoutAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Sign Out", role: .destructive) {
-                // Handle logout
                 signOut()
             }
         } message: {
@@ -256,254 +245,25 @@ struct SettingsView: View {
     }
     
     private func sendFeedback() {
-        // In a real app, this would open mail app or feedback form
+        // TODO: real email address
         if let url = URL(string: "mailto:support@creamie.app?subject=Feedback") {
             UIApplication.shared.open(url)
         }
     }
     
     private func signOut() {
-        // Handle sign out logic
-        print("User signed out")
-        // In a real app, you would:
-        // - Clear user session
-        // - Clear stored data
-        // - Navigate to login screen
+        authService.signOut()
+        print("👋 User signed out")
     }
     
     private func updateOnlineStatus(isOnline: Bool) async {
         await dogProfileViewModel.updateDogOnlineStatus(isOnline: isOnline,
-                                               userId: currentUserId)
-    }
-}
-
-// MARK: - Supporting Views
-
-struct EditProfileView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var name = "John Doe"
-    @State private var email = "john.doe@example.com"
-    @State private var bio = "Dog lover and Creamie owner!"
-    
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Personal Information") {
-                    TextField("Name", text: $name)
-                    TextField("Email", text: $email)
-                        .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
-                }
-                
-                Section("About") {
-                    TextField("Bio", text: $bio, axis: .vertical)
-                        .lineLimit(3...6)
-                }
-            }
-            .navigationTitle("Edit Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        // Handle save
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                }
-            }
-        }
-    }
-}
-
-struct BlockedUsersView: View {
-    @State private var blockedUsers: [String] = []
-    
-    var body: some View {
-        List {
-            if blockedUsers.isEmpty {
-                ContentUnavailableView {
-                    Label("No Blocked Users", systemImage: "person.2.slash")
-                } description: {
-                    Text("Users you block will appear here")
-                }
-            } else {
-                ForEach(blockedUsers, id: \.self) { user in
-                    HStack {
-                        Text(user)
-                        Spacer()
-                        Button("Unblock") {
-                            blockedUsers.removeAll { $0 == user }
-                        }
-                        .foregroundColor(.blue)
-                    }
-                }
-            }
-        }
-        .navigationTitle("Blocked Users")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-struct AboutView: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    Image("Creamie_Selfie")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 100, height: 100)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                    
-                    Text("Creamie")
-                        .font(.largeTitle.bold())
-                    
-                    Text("Connect with dog owners in your area and arrange playdates for your furry friends!")
-                        .font(.body)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Features:")
-                            .font(.headline)
-                        
-                        FeatureRow(icon: "map", text: "Find nearby dogs on an interactive map")
-                        FeatureRow(icon: "message", text: "Chat with other dog owners")
-                        FeatureRow(icon: "calendar", text: "Schedule playdates")
-                        FeatureRow(icon: "photo", text: "Share photos of your dogs")
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal)
-                }
-                .padding()
-            }
-            .navigationTitle("About")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct FeatureRow: View {
-    let icon: String
-    let text: String
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundColor(.blue)
-                .frame(width: 20)
-            Text(text)
-                .font(.subheadline)
-            Spacer()
-        }
-    }
-}
-
-struct PrivacyPolicyView: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Privacy Policy")
-                        .font(.largeTitle.bold())
-                    
-                    Text("Last updated: \(Date().formatted(date: .abbreviated, time: .omitted))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Group {
-                        PolicySection(title: "Information We Collect", content: "We collect information you provide when creating your profile, including your name, email, and dog information.")
-                        
-                        PolicySection(title: "Location Data", content: "We use your location to show nearby dogs and enable meetups. Location data is only shared with your explicit consent.")
-                        
-                        PolicySection(title: "Data Security", content: "We implement security measures to protect your personal information and ensure data privacy.")
-                        
-                        PolicySection(title: "Contact Us", content: "If you have questions about this policy, contact us at privacy@creamie.app")
-                    }
-                }
-                .padding()
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct TermsOfServiceView: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Terms of Service")
-                        .font(.largeTitle.bold())
-                    
-                    Text("Last updated: \(Date().formatted(date: .abbreviated, time: .omitted))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Group {
-                        PolicySection(title: "Acceptance of Terms", content: "By using Creamie, you agree to these terms and conditions.")
-                        
-                        PolicySection(title: "User Responsibilities", content: "Users are responsible for their dogs' behavior during meetups and must ensure their pets are properly vaccinated.")
-                        
-                        PolicySection(title: "Prohibited Conduct", content: "Users must not engage in harassment, share inappropriate content, or misrepresent their dogs or themselves.")
-                        
-                        PolicySection(title: "Limitation of Liability", content: "Creamie is not responsible for incidents that occur during user-arranged meetups.")
-                    }
-                }
-                .padding()
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct PolicySection: View {
-    let title: String
-    let content: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            Text(content)
-                .font(.body)
-        }
+                                                        userId: authService.currentUser?.id)
     }
 }
 
 #Preview {
     SettingsView()
         .environmentObject(LocationManager())
+        .environmentObject(AuthenticationService())
 }

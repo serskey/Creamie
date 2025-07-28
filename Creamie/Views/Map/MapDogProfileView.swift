@@ -7,8 +7,7 @@ struct MapDogProfileView: View {
     @EnvironmentObject private var chatViewModel: ChatViewModel
     @Binding var selectedTab: Int
     @Binding var selectedChatId: UUID?
-    
-    private let currentUserId = UUID(uuidString: "550e8400-e29b-41d4-a716-446655440000")!
+    @EnvironmentObject var authService: AuthenticationService
     
     var body: some View {
         VStack(spacing: 0) {
@@ -71,7 +70,7 @@ struct MapDogProfileView: View {
                             }
                             
                             // Action Buttons - Message Owner
-                            if currentUserId != selectedDog.ownerId {
+                            if authService.currentUser!.id != selectedDog.ownerId {
                                 VStack(spacing: 12) {
                                     Button(action: {
                                         Task {
