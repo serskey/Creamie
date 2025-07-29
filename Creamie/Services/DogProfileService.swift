@@ -2,6 +2,99 @@ import Foundation
 import CoreLocation
 import UIKit
 
+struct UpdateDogRequest: Codable {
+    let name: String?
+    let breed: String?
+    let age: Int?
+    let interests: [String]?
+    let location: Location?
+    let aboutMe: String?
+    let ownerName: String?
+}
+
+struct DogsResponse: Codable {
+    let dogs: [Dog]
+    let totalCount: Int
+    let page: Int
+    let pageSize: Int
+}
+
+struct AddDogRequest: Codable {
+    let name: String
+    let breed: String
+    let age: Int
+    let interests: [String]?
+    let latitude: Double
+    let longitude: Double
+    let photos: [String]
+    let aboutMe: String?
+    let ownerName: String?
+    let ownerId: UUID
+    let isOnline: Bool
+}
+
+struct AddDogResponse: Codable {
+    let status: String
+    let dogId: UUID?
+    let error: String?
+}
+
+struct DeleteDogRequest: Codable {
+    let dogId: UUID
+    let photos: [String]
+}
+
+struct DeleteDogResponse: Codable {
+    let status: String
+    let dogId: UUID
+    let error: String?
+}
+
+
+struct GetUserDogsRequest: Codable {
+    let userId: UUID
+}
+
+struct GetUserDogsResponse: Codable {
+    let dogs: [Dog]
+    let totalCount: Int
+}
+
+struct NearbyDogsRequest: Codable {
+    let northEastLat: Double
+    let northEastLon: Double
+    let southWestLat: Double
+    let southWestLon: Double
+}
+
+struct NearbyDogsResponse: Codable {
+    let dogs: [Dog]
+    let totalCount: Int
+}
+
+struct UploadDogPhotoRequest: Codable {
+    let dogId: UUID
+    let imageData: Data
+}
+
+struct UploadDogPhotoResponse: Codable {
+    let dogId: UUID
+    let imageUrl: String
+    let photos: [String]
+}
+
+struct UpdateDogOnlineStatusRequest: Codable {
+    let isOnline: Bool
+    let dogId: UUID?
+    let ownerId: UUID?
+}
+
+struct UpdateDogOnlineStatusResponse: Codable {
+    let status: String
+    let updatedCount: Int
+    let message: String
+}
+
 // MARK: - Dog Profile Service
 class DogProfileService {
     static let shared = DogProfileService()
@@ -24,7 +117,6 @@ class DogProfileService {
         return response
     }
     
-    /// Get a specific dog by ID
     func getDog(id: UUID) async throws -> Dog {
         let response = try await apiService.request(
             endpoint: "/dogs/dog/\(id.uuidString)",
@@ -35,7 +127,6 @@ class DogProfileService {
         return response
     }
     
-    /// Create a new dog profile
     func createDog(addDogRequest: AddDogRequest) async throws -> AddDogResponse {
         
         let response = try await apiService.request(
@@ -48,7 +139,6 @@ class DogProfileService {
         return response
     }
     
-    /// Update an existing dog profile
     func updateDog(
         id: UUID,
         name: String?,
@@ -81,12 +171,20 @@ class DogProfileService {
     }
     
     /// Delete a dog profile
-    func deleteDog(id: UUID) async throws {
-        let _: EmptyResponse = try await apiService.request(
-            endpoint: "/dogs/dog/\(id.uuidString)",
-            method: .DELETE,
-            responseType: EmptyResponse.self
+    func deleteDog(id: UUID, photos: [String]) async throws -> DeleteDogResponse {
+        let request = DeleteDogRequest(
+            dogId: id,
+            photos: photos
         )
+        
+        let response = try await apiService.request(
+            endpoint: "/dogs",
+            method: .DELETE,
+            body: request,
+            responseType: DeleteDogResponse.self
+        )
+        
+        return response
     }
     
     func uploadDogPhoto(dogId: UUID, image: UIImage) async throws -> UploadDogPhotoResponse {
@@ -126,9 +224,7 @@ class DogProfileService {
         let uploadDogPhotoResponse = try JSONDecoder().decode(UploadDogPhotoResponse.self, from: data)
         return uploadDogPhotoResponse
     }
-
     
-    /// Delete a photo for a dog
     func deleteDogPhoto(dogId: UUID, photoName: String) async throws {
         let _: EmptyResponse = try await apiService.request(
             endpoint: "/dogs/\(dogId.uuidString)/photos/\(photoName)",
@@ -137,7 +233,6 @@ class DogProfileService {
         )
     }
     
-    /// Search dogs by various criteria
     func searchDogs(name: String?, breed: String?, location: Location?, radius: Double?) async throws -> [Dog] {
         var queryItems: [String] = []
         
@@ -167,7 +262,6 @@ class DogProfileService {
         return response.dogs.map { $0 }
     }
     
-    /// Get dogs by breed
     func getDogsByBreed(_ breed: DogBreed) async throws -> [Dog] {
         let response = try await apiService.request(
             endpoint: "/dogs/breed/\(breed.rawValue)",
@@ -178,7 +272,6 @@ class DogProfileService {
         return response.dogs.map { $0 }
     }
     
-    /// Get dogs within a specific radius
     func getNearbyDogs(location: Location, radius: Double = 5.0) async throws -> [Dog] {
         let endpoint = "/dogs/nearby?lat=\(location.latitude)&lng=\(location.longitude)&radius=\(radius)"
         let response = try await apiService.request(
@@ -202,7 +295,6 @@ class DogProfileService {
         return response
 
     }
-    
     
 }
 

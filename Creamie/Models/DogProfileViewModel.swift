@@ -3,6 +3,68 @@ import SwiftUI
 import CoreLocation
 import UIKit
 
+struct Dog: Identifiable, Hashable, Codable {
+    var id: UUID
+    var name: String
+    var breed: DogBreed
+    var age: Int
+    var interests: [String]?
+    var aboutMe: String?
+    var photos: [String]
+    var latitude: Double
+    var longitude: Double
+    var ownerId: UUID
+    var ownerName: String?
+    var isOnline: Bool
+    var updatedAt: Date?
+    var createdAt: Date?
+    
+    // Convenience property for backward compatibility
+    var photo: String {
+        return photos.first ?? "dog_Sample"
+    }
+    
+    static func == (lhs: Dog, rhs: Dog) -> Bool {
+        lhs.id == rhs.id
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    init(
+            id: UUID,
+            name: String,
+            breed: DogBreed,
+            age: Int,
+            interests: [String]? = nil,
+            aboutMe: String? = nil,
+            photos: [String],
+            latitude: Double,
+            longitude: Double,
+            ownerId: UUID,
+            ownerName: String? = nil,
+            isOnline: Bool,
+            updatedAt: Date,
+            createdAt: Date? = nil,
+        ) {
+            self.id = id
+            self.name = name
+            self.breed = breed
+            self.age = age
+            self.interests = interests
+            self.latitude = latitude
+            self.longitude = longitude
+            self.photos = photos
+            self.aboutMe = aboutMe
+            self.ownerId = ownerId
+            self.ownerName = ownerName
+            self.isOnline = isOnline
+            self.updatedAt = updatedAt
+            self.createdAt = createdAt
+        }
+}
+
 @MainActor
 class DogProfileViewModel: ObservableObject {
     @Published var dogs: [Dog] = []
@@ -13,10 +75,11 @@ class DogProfileViewModel: ObservableObject {
     @Published var dogToDelete: Dog?
     @Published var addDogError: String?
     @Published var addDogSuccess: String?
+    @Published var deleteDogError: String?
+    @Published var deleteDogSuccess: String?
     
     private let dogProfileService = DogProfileService.shared
     
-    // Photo storage
     private var photoCounter = 0
     
     private let minPhotos = 1
@@ -28,7 +91,6 @@ class DogProfileViewModel: ObservableObject {
             let response = try await dogProfileService.fetchUserDogs(getUserDogsRequest: getUserDogsRequest)
             self.dogs = response.dogs
             
-            // Debug: Print photo URLs to verify backend data
             for dog in response.dogs {
                 print("📸 Dog \(dog.name) photos:")
                 for (index, photo) in dog.photos.enumerated() {
@@ -56,10 +118,8 @@ class DogProfileViewModel: ObservableObject {
         ownerId: UUID,
         isOnline: Bool
     ) {
-        // Will upload photos after dog creation succeeds
         var photoNames: [String] = []
         
-        // Save dog to backend database first
         Task {
             var response: AddDogResponse?
             do {
@@ -77,18 +137,18 @@ class DogProfileViewModel: ObservableObject {
                     isOnline: isOnline
                 )
                 
+                // Step1: save dog profile to db
                 response = try await DogProfileService.shared.createDog(addDogRequest: addDogRequest)
                 
-                // Check if backend response indicates success
                 if let response = response, response.status.lowercased() == "success", let dogId = response.dogId {
-                    print("🐾 Successfully saved dog to backend: \(dogId)")
+                    print("🐾 Successfully saved dog profile to backend: \(dogId)")
                     
-                    // Upload ALL photos - this must succeed for minimum photos requirement
+                    // Step2: Upload dog photos to storage
                     photoNames = await uploadPhotos(photos, for: dogId)
                     
-                    // Check if we have the minimum required photos (1 minimum from UI validation)
                     if photoNames.count >= minPhotos {
-                        // SUCCESS: Both dog creation and photo upload succeeded
+                        
+                        // Step3: append dog to local
                         let newDog = Dog(
                             id: dogId,
                             name: name,
@@ -109,57 +169,72 @@ class DogProfileViewModel: ObservableObject {
                         dogs.append(newDog)
                         showingAddDog = false
                         
-                        // Show success message
-                        let photoCount = photoNames.count
-                        self.addDogSuccess = "\(name) has been successfully added with \(photoCount) photo(s)!"
+                        self.addDogSuccess = "\(name) has been successfully added with \(photoNames.count) photo(s)!"
                     } else {
-                        // FAILURE: Photo upload failed - rollback dog creation
                         print("❌ Photo upload failed (\(photoNames.count)/\(photos.count) uploaded), rolling back dog creation")
                         // TODO: Add backend API to delete the created dog and delete uploaded photos
-                        // await DogProfileService.shared.deleteDog(dogId: dogId)
+                        // await DogProfileService.shared.deleteDogProfile(dogId: dogId)
                         
                         self.addDogError = "Failed to upload enough photos for \(name). At least 2 photos are required. Please try again."
                     }
                 } else {
-                    // Backend returned failure status
                     let errorMessage = response?.error ?? "Unknown error occurred"
                     self.addDogError = "Unable to save \(name): \(errorMessage)"
                 }
                 
             } catch {
                 print("❌ Failed to save dog to backend: \(String(describing: response?.error))")
-                // Set specific error for add dog failures
                 self.addDogError = "Unable to save \(name). Please check your internet connection and try again."
             }
         }
     }
 
-    func deleteDog(at indexSet: IndexSet) {
-        // Delete all photos for each dog being deleted
-        for index in indexSet {
-            let dog = dogs[index]
-            for photoName in dog.photos {
-                if !photoName.starts(with: "dog_Creamie") {
-                    deleteImage(named: photoName)
-                }
-            }
-        }
-        
-        dogs.remove(atOffsets: indexSet)
-        // TODO: In a real app, you would also delete from your backend/database
-    }
+//    func deleteDog(at indexSet: IndexSet) {
+//        for index in indexSet {
+//            let dog = dogs[index]
+//            
+//            // Step1: delete dog from backend
+//            var response: DeleteDogResponse?
+//            
+//            do {
+//                let response = try await DogProfileService.shared.deleteDog(id: dog.id)
+//            } catch {
+//                print("❌ Failed to save dog to backend: \(String(describing: response?.error))")
+//                self.deleteDogError = "Unable to delete \(dog.name). Please check your internet connection and try again."
+//            }
+//            
+//            // Step2: Clean up dog photos from local
+//            for photoName in dog.photos {
+//                if photoName.starts(with: "dog_Creamie") {
+//                    continue
+//                }
+//        
+//                deleteImage(named: photoName)
+//                
+//            }
+//        }
+//        
+//        // Step3: Remove dog profile from local
+//        dogs.remove(atOffsets: indexSet)
+//    }
     
-    func deleteDog(dog: Dog) {
+    func deleteDog(dog: Dog) async throws {
+        print("🔄 Deleting dog: \(dog.name)")
         if let index = dogs.firstIndex(where: { $0.id == dog.id }) {
-            // Delete all photos for the dog
-            for photoName in dog.photos {
-                if !photoName.starts(with: "dog_Creamie") {
-                    deleteImage(named: photoName)
-                }
+            // Step1: delete dog from backend
+            var response: DeleteDogResponse?
+            
+            do {
+                response = try await DogProfileService.shared.deleteDog(id: dog.id, photos: dog.photos)
+                
+            } catch {
+                print("❌ Failed to delete dog from backend: \(String(describing: response?.error))")
+                self.deleteDogError = "Unable to delete \(dog.name). Please check your internet connection and try again."
+                throw APIError.serverError(500)
             }
             
+            // Step2: Remove dog profile from local
             dogs.remove(at: index)
-            // TODO: In a real app, you would also delete from your backend/database
             print("🗑️ Deleted dog: \(dog.name)")
         }
         dogToDelete = nil
@@ -170,14 +245,6 @@ class DogProfileViewModel: ObservableObject {
         showingDeleteConfirmation = true
     }
     
-    // MARK: - Photo Upload Functions
-    
-    /// Upload multiple photos for a dog to the backend
-    /// - Parameters:
-    ///   - photos: Array of UIImages to upload
-    ///   - dogId: UUID of the dog to associate photos with
-    /// Uploads all photos for a dog. Uses all-or-nothing approach.
-    /// - Returns: Array of successfully uploaded photo filenames (empty if any upload fails)
     private func uploadPhotos(_ photos: [UIImage], for dogId: UUID) async -> [String] {
         var photoNames: [String] = []
         
@@ -197,18 +264,6 @@ class DogProfileViewModel: ObservableObject {
         
         print("📤 All \(photoNames.count) photos uploaded")
         return photoNames
-    }
-    
-    private func deleteImage(named name: String) {
-        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = documentsDirectory.appendingPathComponent("\(name).jpg")
-        
-        do {
-            try FileManager.default.removeItem(at: fileURL)
-            print("🗑️ Deleted image at: \(fileURL.path)")
-        } catch {
-            print("❌ Error deleting image: \(error)")
-        }
     }
     
     func updateDogOnlineStatus(isOnline: Bool, dogId: UUID? = nil, userId: UUID? = nil) async {

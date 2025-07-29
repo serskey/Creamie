@@ -9,6 +9,8 @@ struct DogProfilesView: View {
     @State private var showFullMap: Bool = false
     @State private var currentDogIndex: Int = 0
     @EnvironmentObject var authService: AuthenticationService
+    @State private var showDeletionAlert = false
+    @State private var alertDeletionErrorMessage = ""
     
     private let locationService = DogLocationService.shared
     
@@ -33,7 +35,6 @@ struct DogProfilesView: View {
             }
         }
         .task {
-            // TODO: change to real login user id
             await viewModel.fetchUserDogs(userId: authService.currentUser!.id)
         }
         .onChange(of: viewModel.dogs) { _, newDogs in
@@ -53,15 +54,19 @@ struct DogProfilesView: View {
              
             Button("Delete", role: .destructive) {
                 if let dogToDelete = viewModel.dogToDelete {
-                    viewModel.deleteDog(dog: dogToDelete)
-                    if selectedDog?.id == dogToDelete.id {
-                        selectedDog = nil
+                    Task {
+                        do {
+                            try await viewModel.deleteDog(dog: dogToDelete)
+                            if selectedDog?.id == dogToDelete.id {
+                                selectedDog = nil
+                            }
+                        } catch {
+                            alertDeletionErrorMessage = "Unable to delete the dog. Please check your internet connection and try again."
+                            showDeletionAlert = true
+                        }
                     }
                 }
             }
-//            .buttonStyle(.glassProminent)
-//            .tint(.purple.opacity(0.8))
-            // TODO: Button color change not working
             
         } message: {
             if let dog = viewModel.dogToDelete {
@@ -82,6 +87,26 @@ struct DogProfilesView: View {
             }
         } message: {
             Text(viewModel.addDogSuccess ?? "")
+        }
+        .alert("Deletion Failed", isPresented: $showDeletionAlert) {
+            Button("OK") { }
+            Button("Retry") {
+                if let dogToDelete = viewModel.dogToDelete {
+                    Task {
+                        do {
+                            try await viewModel.deleteDog(dog: dogToDelete)
+                            if selectedDog?.id == dogToDelete.id {
+                                selectedDog = nil
+                            }
+                        } catch {
+                            alertDeletionErrorMessage = "Unable to delete the dog. Please try again later."
+                            showDeletionAlert = true
+                        }
+                    }
+                }
+            }
+        } message: {
+            Text(alertDeletionErrorMessage)
         }
     }
     

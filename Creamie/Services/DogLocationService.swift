@@ -3,6 +3,15 @@ import CoreLocation
 import Combine
 
 // MARK: - Data Models for API
+struct Location: Codable, Hashable {
+    let latitude: Double
+    let longitude: Double
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
 struct DogLocationUpdate: Codable {
     let id: UUID
     let location: Location
