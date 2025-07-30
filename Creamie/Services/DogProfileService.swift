@@ -2,16 +2,6 @@ import Foundation
 import CoreLocation
 import UIKit
 
-struct UpdateDogRequest: Codable {
-    let name: String?
-    let breed: String?
-    let age: Int?
-    let interests: [String]?
-    let location: Location?
-    let aboutMe: String?
-    let ownerName: String?
-}
-
 struct DogsResponse: Codable {
     let dogs: [Dog]
     let totalCount: Int
@@ -95,6 +85,23 @@ struct UpdateDogOnlineStatusResponse: Codable {
     let message: String
 }
 
+struct UpdateDogProfileRequest: Codable {
+    let dogId: UUID
+    let name: String
+    let breed: String
+    let age: Int
+    let interests: [String]
+    let photos: [String]
+    let aboutMe: String?
+}
+
+struct UpdateDogProfileResponse: Codable {
+    let status: String
+    let error: String?
+    let dogId: UUID
+}
+
+
 // MARK: - Dog Profile Service
 class DogProfileService {
     static let shared = DogProfileService()
@@ -139,38 +146,6 @@ class DogProfileService {
         return response
     }
     
-    func updateDog(
-        id: UUID,
-        name: String?,
-        breed: DogBreed?,
-        age: Int?,
-        interests: [String]?,
-        location: Location?,
-        aboutMe: String?,
-        ownerName: String?
-    ) async throws -> Dog {
-        
-        let request = UpdateDogRequest(
-            name: name,
-            breed: breed?.rawValue,
-            age: age,
-            interests: interests,
-            location: location,
-            aboutMe: aboutMe,
-            ownerName: ownerName
-        )
-        
-        let response = try await apiService.request(
-            endpoint: "/dogs/dog/\(id.uuidString)",
-            method: .PUT,
-            body: request,
-            responseType: Dog.self
-        )
-        
-        return response
-    }
-    
-    /// Delete a dog profile
     func deleteDog(id: UUID, photos: [String]) async throws -> DeleteDogResponse {
         let request = DeleteDogRequest(
             dogId: id,
@@ -296,6 +271,27 @@ class DogProfileService {
 
     }
     
+    func updateDog(updateDogRequest: UpdateDogProfileRequest) async throws -> UpdateDogProfileResponse {
+//        let request = UpdateDogProfileRequest(
+//            dogId: updateDogRequest.dogId,
+//            name: updateDogRequest.name,
+//            breed: updateDogRequest.breed,
+//            age: updateDogRequest.age,
+//            interests: updateDogRequest.interests,
+//            photos: updateDogRequest.photos,
+//            aboutMe: updateDogRequest.aboutMe
+//        )
+        
+        let response = try await apiService.request(
+            endpoint: "/dogs/update",
+            method: .PUT,
+            body: updateDogRequest,
+            responseType: UpdateDogProfileResponse.self
+        )
+        
+        return response
+
+    }
 }
 
 // MARK: - Helper Extensions

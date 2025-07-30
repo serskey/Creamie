@@ -1,6 +1,51 @@
 import SwiftUI
 import Combine
 
+struct LoginRequest: Codable {
+    let email: String
+    let password: String
+}
+
+struct SignUpRequest: Codable {
+    let email: String
+    let password: String
+    let name: String
+    let phoneNumber: String
+}
+
+struct UpdateProfileRequest: Codable {
+    let name: String
+    let phoneNumber: String
+    let photos: [String]?
+}
+
+struct AuthResponse: Codable {
+    let success: Bool
+    let message: String?
+    let user: User?
+    let token: String?
+}
+
+struct User: Codable, Identifiable {
+    let id: UUID
+    let name: String
+    let email: String
+    let phoneNumber: String?
+    let photos: [String]?
+    let createdAt: String
+    let updatedAt: String
+    
+    var firstName: String {
+        name.components(separatedBy: " ").first ?? name
+    }
+    
+    var lastName: String {
+        let components = name.components(separatedBy: " ")
+        return components.count > 1 ? components.dropFirst().joined(separator: " ") : ""
+    }
+}
+
+
 @MainActor
 class AuthenticationViewModel: ObservableObject {
     enum AuthStep {

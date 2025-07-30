@@ -77,6 +77,7 @@ class DogProfileViewModel: ObservableObject {
     @Published var addDogSuccess: String?
     @Published var deleteDogError: String?
     @Published var deleteDogSuccess: String?
+    @Published var showingEditDog = false
     
     private let dogProfileService = DogProfileService.shared
     
@@ -188,35 +189,6 @@ class DogProfileViewModel: ObservableObject {
             }
         }
     }
-
-//    func deleteDog(at indexSet: IndexSet) {
-//        for index in indexSet {
-//            let dog = dogs[index]
-//            
-//            // Step1: delete dog from backend
-//            var response: DeleteDogResponse?
-//            
-//            do {
-//                let response = try await DogProfileService.shared.deleteDog(id: dog.id)
-//            } catch {
-//                print("❌ Failed to save dog to backend: \(String(describing: response?.error))")
-//                self.deleteDogError = "Unable to delete \(dog.name). Please check your internet connection and try again."
-//            }
-//            
-//            // Step2: Clean up dog photos from local
-//            for photoName in dog.photos {
-//                if photoName.starts(with: "dog_Creamie") {
-//                    continue
-//                }
-//        
-//                deleteImage(named: photoName)
-//                
-//            }
-//        }
-//        
-//        // Step3: Remove dog profile from local
-//        dogs.remove(atOffsets: indexSet)
-//    }
     
     func deleteDog(dog: Dog) async throws {
         print("🔄 Deleting dog: \(dog.name)")
@@ -302,31 +274,84 @@ class DogProfileViewModel: ObservableObject {
             print("❌ Failed to update online status: \(error)")
         }
     }
-        
-//    /// Save an image to the Documents directory with a specific filename
-//    /// - Parameters:
-//    ///   - image: The UIImage to save
-//    ///   - name: The filename to use (without extension)
-//    /// - Returns: The filename that was saved (for consistency)
-//    private func saveImage(_ image: UIImage, name: String) -> String {
-//        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-//        
-//        // Remove any file extension and add .jpg
-//        let cleanName = name.replacingOccurrences(of: ".jpg", with: "").replacingOccurrences(of: ".jpeg", with: "")
-//        let filename = "\(cleanName).jpg"
-//        let fileURL = documentsDirectory.appendingPathComponent(filename)
-//        
-//        if let imageData = image.jpegData(compressionQuality: 0.8) {
-//            do {
-//                try imageData.write(to: fileURL)
-//                print("Saved image locally: \(filename)")
-//                return cleanName // Return name without extension for consistency
-//            } catch {
-//                print("Error saving image \(filename): \(error)")
-//                return cleanName // Return the name even if saving failed
-//            }
-//        }
-//        
-//        return cleanName
-//    }
+
+    func updateDog(
+        dogId: UUID,
+        name: String,
+        breed: DogBreed,
+        age: Int,
+        interests: [String] = [],
+        existingPhotos: [String],
+        newPhotos: [UIImage],
+        aboutMe: String?,
+        photosToDelete: [String]
+    ) {
+        Task {
+            var finalPhotos = existingPhotos
+            var response: UpdateDogProfileResponse?
+            
+            do {
+                // Step 1: Upload new photos if any
+                if !newPhotos.isEmpty {
+                    let newPhotoNames = await uploadPhotos(newPhotos, for: dogId)
+                    if newPhotoNames.count == newPhotos.count {
+                        finalPhotos.append(contentsOf: newPhotoNames)
+                        print("📸 Successfully uploaded \(newPhotoNames.count) new photos")
+                    } else {
+                        print("❌ Failed to upload all new photos")
+                        self.addDogError = "Failed to upload some photos. Please try again."
+                        return
+                    }
+                }
+                
+                // Step 2: Update dog profile in backend
+                let updateDogRequest = UpdateDogProfileRequest(
+                    dogId: dogId,
+                    name: name,
+                    breed: breed.rawValue,
+                    age: age,
+                    interests: interests,
+                    photos: finalPhotos,
+                    aboutMe: aboutMe
+                )
+                
+                response = try await DogProfileService.shared.updateDog(updateDogRequest: updateDogRequest)
+                
+                if let response = response, response.status.lowercased() == "success" {
+                    print("🐾 Successfully updated dog profile in backend")
+                    
+                    // Step 3: Update local dog data
+                    if let index = dogs.firstIndex(where: { $0.id == dogId }) {
+                        dogs[index] = Dog(
+                            id: dogId,
+                            name: name,
+                            breed: breed,
+                            age: age,
+                            interests: interests,
+                            aboutMe: aboutMe,
+                            photos: finalPhotos,
+                            latitude: dogs[index].latitude,
+                            longitude: dogs[index].longitude,
+                            ownerId: dogs[index].ownerId,
+                            ownerName: dogs[index].ownerName,
+                            isOnline: dogs[index].isOnline,
+                            updatedAt: Date.now,
+                            createdAt: dogs[index].createdAt
+                        )
+                    }
+                    
+                    showingEditDog = false
+                    self.addDogSuccess = "\(name) has been successfully updated!"
+                    
+                } else {
+                    let errorMessage = response?.error ?? "Unknown error occurred"
+                    self.addDogError = "Unable to update \(name): \(errorMessage)"
+                }
+                
+            } catch {
+                print("❌ Failed to update dog in backend: \(String(describing: response?.error))")
+                self.addDogError = "Unable to update \(name). Please check your internet connection and try again."
+            }
+        }
+    }
 }
