@@ -101,6 +101,13 @@ struct UpdateDogProfileResponse: Codable {
     let dogId: UUID
 }
 
+struct SearchDogsRequest: Codable {
+    let query: String
+}
+
+struct SearchDogsResponse: Codable {
+    let dogs: [Dog]
+}
 
 // MARK: - Dog Profile Service
 class DogProfileService {
@@ -208,33 +215,29 @@ class DogProfileService {
         )
     }
     
-    func searchDogs(name: String?, breed: String?, location: Location?, radius: Double?) async throws -> [Dog] {
-        var queryItems: [String] = []
-        
-        if let name = name {
-            queryItems.append("name=\(name)")
+    func searchDogs(query: String?, breed: String?, location: Location?, radius: Double?) async throws -> [Dog] {
+        guard let unwrappedQuery = query, !unwrappedQuery.isEmpty else {
+            let endpoint = "/dogs/semantic-search"
+            let response = try await apiService.request(
+                endpoint: endpoint,
+                method: .GET,
+                responseType: DogsResponse.self
+            )
+            return response.dogs
         }
-        if let breed = breed {
-            queryItems.append("breed=\(breed)")
-        }
-        if let location = location {
-            queryItems.append("lat=\(location.latitude)")
-            queryItems.append("lng=\(location.longitude)")
-        }
-        if let radius = radius {
-            queryItems.append("radius=\(radius)")
-        }
-        
-        let queryString = queryItems.isEmpty ? "" : "?" + queryItems.joined(separator: "&")
-        let endpoint = "/dogs/search\(queryString)"
-        
+
+        let endpoint = "/dogs/semantic-search"
+        let body = SearchDogsRequest(
+            query: unwrappedQuery
+        )
         let response = try await apiService.request(
             endpoint: endpoint,
-            method: .GET,
-            responseType: DogsResponse.self
+            method: .POST,
+            body: body,
+            responseType: SearchDogsResponse.self
         )
-        
-        return response.dogs.map { $0 }
+        print("Founds dogs: \(response) ")
+        return response.dogs
     }
     
     func getDogsByBreed(_ breed: DogBreed) async throws -> [Dog] {
@@ -301,4 +304,4 @@ extension Data {
             append(data)
         }
     }
-} 
+}

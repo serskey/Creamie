@@ -18,6 +18,7 @@ struct MapView: View {
     @State private var selectedBreeds: Set<DogBreed> = Set(DogBreed.popularBreeds)
     @State private var isTrackingUserLocation = true
     @State private var searchText = ""
+    @State private var isSemanticSearchActive = false
     
     // MARK: - Computed Properties
     private var hasLocationPermission: Bool {
@@ -26,9 +27,11 @@ struct MapView: View {
     }
 
     private var filteredDogs: [Dog] {
-        viewModel.nearbyDogs.filter { dog in
+        let dogsToFilter = viewModel.displayedDogs
+        
+        return dogsToFilter.filter { dog in
             let matchesBreed = selectedBreeds.contains(dog.breed)
-            let matchesSearch = searchText.isEmpty || 
+            let matchesSearch = searchText.isEmpty || isSemanticSearchActive ||
                                dog.name.lowercased().contains(searchText.lowercased()) ||
                                dog.breed.rawValue.lowercased().contains(searchText.lowercased())
             return matchesBreed && matchesSearch
@@ -41,6 +44,11 @@ struct MapView: View {
             mapContent
             if hasLocationPermission {
                 mapOverlay
+            }
+            
+            // Search loading indicator
+            if viewModel.isSearching {
+                searchLoadingOverlay
             }
         }
         .sheet(isPresented: $showingFilters) {
@@ -59,6 +67,18 @@ struct MapView: View {
         }
         .onChange(of: locationManager.userLocation) { _, newLocation in
             handleLocationChange(newLocation)
+        }
+        .onChange(of: searchText) { _, newValue in
+            handleSearchTextChange(newValue)
+        }
+        .alert("Search Error", isPresented: .constant(viewModel.searchError != nil)) {
+            Button("OK") {
+                viewModel.searchError = nil
+            }
+        } message: {
+            if let error = viewModel.searchError {
+                Text(error)
+            }
         }
     }
 }
@@ -105,20 +125,44 @@ private extension MapView {
         DragGesture()
             .onChanged { _ in
                 isTrackingUserLocation = false
-                    }
+            }
             .onEnded { _ in
-                viewModel.debouncedFetchDogs()
+                if !isSemanticSearchActive {
+                    viewModel.debouncedFetchDogs()
+                }
             }
             .simultaneously(with:
                 MagnificationGesture()
-                            .onChanged { _ in
-                                isTrackingUserLocation = false
-                            }
+                    .onChanged { _ in
+                        isTrackingUserLocation = false
+                    }
                     .onEnded { _ in
-                        viewModel.debouncedFetchDogs()
+                        if !isSemanticSearchActive {
+                            viewModel.debouncedFetchDogs()
+                        }
                     }
             )
     }
+    
+    var searchLoadingOverlay: some View {
+        VStack {
+            Spacer()
+            HStack {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.5)
+                Text("Searching...")
+                    .foregroundColor(Color.pink)
+                    .font(.default)
+                    .fontWeight(.bold)
+            }
+            .padding(30)
+            .glassEffect(.clear.interactive().tint(Color.purple.opacity(0.5)))
+            .cornerRadius(15)
+            Spacer()
+        }
+    }
+
 }
 
 // MARK: - Map Overlay
@@ -133,11 +177,10 @@ private extension MapView {
     var topControls: some View {
         HStack {
             searchAndFilterBar
+            
             Spacer()
             
-            if hasLocationPermission {
-                myLocationButton
-            }
+            myLocationButton
         }
     }
     
@@ -145,19 +188,36 @@ private extension MapView {
         HStack(spacing: 12) {
             // Search Bar
             HStack {
-                Image("magnifyingglass")
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(Color.purple)
                 
                 TextField("Search dogs...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 16))
+                    .onSubmit {
+                        performSearch()
+                    }
                 
+                // Search/Clear button
                 if !searchText.isEmpty {
-                    Button(action: {
-                        searchText = ""
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.pink)
-                            .font(.system(size: 14))
+                    if !isSemanticSearchActive {
+                        // Search button - only show when not actively searching
+                        Button(action: {
+                            performSearch()
+                        }) {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .foregroundColor(Color.pink)
+                                .font(.system(size: 16))
+                        }
+                    } else {
+                        // Clear button - show when search is active
+                        Button(action: {
+                            clearSearch()
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.pink)
+                                .font(.system(size: 16))
+                        }
                     }
                 }
             }
@@ -235,13 +295,49 @@ private extension MapView {
             position = .region(context.region)
         }
         
-        viewModel.debouncedFetchDogs()
+        // Only fetch new dogs if not actively searching
+        if !isSemanticSearchActive {
+            viewModel.debouncedFetchDogs()
+        }
     }
     
     func centerOnUserLocation() {
         withAnimation {
             position = .userLocation(fallback: .automatic)
             isTrackingUserLocation = true
+        }
+        
+//        // clear sermatic search when back to my location
+//        if isSearchActive {
+//            clearSearch()
+//        }
+    }
+    
+    func handleSearchTextChange(_ newValue: String) {
+        // Only clear search if text becomes empty
+        if newValue.isEmpty {
+            clearSearch()
+        }
+    }
+    
+    func performSearch() {
+        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            clearSearch()
+            return
+        }
+        
+        isSemanticSearchActive = true
+        viewModel.searchDogs(query: searchText, userLocation: locationManager.userLocation)
+    }
+    
+    func clearSearch() {
+        searchText = ""
+        isSemanticSearchActive = false
+        viewModel.clearSearch()
+        
+        // Return to showing nearby dogs
+        if hasLocationPermission {
+            viewModel.fetchNearbyDogs()
         }
     }
 }
@@ -291,7 +387,6 @@ struct LocationPermissionDeniedView: View {
                 .padding()
             
             Button("Open Settings") {
-                // TODO: Go deeply to this specific app's location setting
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }

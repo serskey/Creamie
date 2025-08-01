@@ -3,6 +3,7 @@ import CoreLocation
 import PhotosUI
 
 // TODO: Retry on failure and fallback photo upload on failure
+// TODO: Bug fix - delete photo messed up
 struct EditDogView: View {
     @ObservedObject var viewModel: DogProfileViewModel
     @Environment(\.dismiss) private var dismiss
