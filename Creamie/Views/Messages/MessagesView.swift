@@ -8,7 +8,9 @@ struct MessagesView: View {
     @State private var chatToDelete: Chat?
     @State private var showingDeleteConfirmation = false
     @State private var animate = false
+    @State private var userDogs: [Dog] = []
     @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject var dogProfileViewModel: DogProfileViewModel
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -33,7 +35,7 @@ struct MessagesView: View {
                     .onAppear { animate = true }
                     
                     ForEach(chatViewModel.chats) { chat in
-                        ChatRow(chat: chat)
+                        ChatRow(chat: chat, userDogs: userDogs)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 navigationPath.append(chat)
@@ -52,6 +54,8 @@ struct MessagesView: View {
             .onAppear {
                 Task {
                     await chatViewModel.fetchChatsByCurrentUserId(currentUserId: authService.currentUser!.id)
+                    await dogProfileViewModel.fetchUserDogs(userId: authService.currentUser!.id)
+                    userDogs = dogProfileViewModel.dogs
                     
                     if let chatId = selectedChatId,
                        let chat = chatViewModel.chats.first(where: { $0.id == chatId }) {
@@ -92,7 +96,7 @@ struct MessagesView: View {
                 }
             } message: {
                 if let chat = chatToDelete {
-                    Text("Are you sure you want to delete your conversation with \(chat.otherDogName)'s owner? This action cannot be undone.")
+                    Text("Are you sure you want to delete your conversation between your dog and \(chat.otherDogName)? This action cannot be undone.")
                 }
             }
             .listStyle(.insetGrouped)
@@ -110,16 +114,38 @@ struct MessagesView: View {
 
 struct ChatRow: View {
     let chat: Chat
+    let userDogs: [Dog]
+    
+    private func getCurrentDogPhoto() -> String {
+        // Find the current dog in userDogs array using currentDogId
+        if let currentDogId = chat.currentDogId,
+           let currentDog = userDogs.first(where: { $0.id == currentDogId }) {
+            return currentDog.photos.first ?? ""
+        }
+        return ""
+    }
     
     var body: some View {
         HStack(spacing: 12) {
-            
-            AcatarView(photoName: chat.otherDogAvatar)
+            // Dog-to-dog conversation display
+            HStack(spacing: -8) {
+                // Your dog (left, slightly behind) - using current dog's photo
+                AcatarView(photoName: getCurrentDogPhoto())
+                    .frame(width: 35, height: 35)
+                    .zIndex(0)
+                
+                // Other dog (right, in front) - using their avatar
+                AcatarView(photoName: chat.otherDogAvatar)
+                    .frame(width: 40, height: 40)
+                    .zIndex(1)
+            }
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(chat.otherDogName)
+                    // Show both dog names
+                    Text("\(chat.currentDogName ?? "Your Dog") & \(chat.otherDogName)")
                         .font(.headline)
+                        .lineLimit(1)
                     Spacer()
                     Text(chat.lastMessageDate, style: .time)
                         .font(.caption)

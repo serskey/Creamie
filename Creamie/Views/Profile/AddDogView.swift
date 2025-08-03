@@ -3,49 +3,346 @@ import CoreLocation
 import PhotosUI
 
 struct AddDogView: View {
-    @ObservedObject var viewModel: DogProfileViewModel
+    // MARK: - View Models & Environment
+    @ObservedObject var dogProfileViewModel: DogProfileViewModel
+    @ObservedObject var dogHealthViewModel: DogHealthViewModel
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var locationManager: LocationManager
     @EnvironmentObject var authService: AuthenticationService
     
+    // MARK: - Basic Information State
     @State private var name: String = ""
     @State private var selectedBreed: DogBreed = .cockapoo
     @State private var age: Int = 1
+    @State private var aboutMe: String = ""
+    
+    // MARK: - Interests State
     @State private var interestText: String = ""
     @State private var interests: [String] = []
-    @State private var aboutMe: String = ""
-    @State private var ownerName: String = ""
-    @State private var showingDeleteAlert = false
-    @State private var interestToDelete: String = ""
     
-    // Photo selection
-    @State private var selectedItems: [PhotosPickerItem?] = [nil, nil, nil, nil, nil, nil]
-    @State private var selectedImages: [UIImage?] = [nil, nil, nil, nil, nil, nil]
+    // MARK: - Healthcare State
+    @State private var weightKg: String = ""
+    @State private var vaccinationName: String = ""
+    @State private var veterinarianName: String = ""
+    @State private var groomingService: String = ""
+    @State private var groomingLocation: String = ""
+    @State private var medicationName: String = ""
+    @State private var medicationDosage: String = ""
+    @State private var medicationFrequency: String = ""
+    @State private var vetVisitPurpose: String = ""
+    @State private var vetClinicName: String = ""
+    @State private var generalHealthNotes: String = ""
+    
+    // MARK: - Photo Selection State
+    @State private var selectedItems: [PhotosPickerItem?] = Array(repeating: nil, count: 6)
+    @State private var selectedImages: [UIImage?] = Array(repeating: nil, count: 6)
     @State private var currentEditingIndex: Int? = nil
     
-    // Maximum number of photos allowed
+    // MARK: - Constants
     private let maxPhotos = 6
-    
-    // Minimum number of photos acquired
     private let minPhotos = 1
     
-    // Computed property to get current location or default
+    // MARK: - Body
+    var body: some View {
+        NavigationView {
+            Form {
+                photosSection
+                basicInformationSection
+                interestsSection
+                aboutMeSection
+                healthcareSection
+                locationSection
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                toolbarContent
+            }
+            .photosPicker(
+                isPresented: photosPickerBinding,
+                selection: selectedItemBinding,
+                matching: .images
+            )
+        }
+    }
+}
+
+// MARK: - Form Sections
+extension AddDogView {
+    private var photosSection: some View {
+        Section(header: Text("Photos")) {
+            VStack(spacing: 16) {
+                photoGrid
+                photoRequirementMessage
+            }
+            .padding(.vertical, 8)
+        }
+    }
+    
+    private var basicInformationSection: some View {
+        Section(header: Text("Basic Information")) {
+            TextField("Dog's Name", text: $name)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+            
+            Picker("Breed", selection: $selectedBreed) {
+                ForEach(DogBreed.sortedBreeds, id: \.self) { breed in
+                    Text(breed.rawValue)
+                        .foregroundColor(Color.primary)
+                        .tag(breed)
+                }
+            }
+            .pickerStyle(.automatic)
+            
+            Stepper("Age: \(age) year\(age == 1 ? "" : "s")", value: $age, in: 1...50)
+        }
+    }
+    
+    private var interestsSection: some View {
+        Section(header: Text("Interests")) {
+            interestInputRow
+            interestsDisplay
+            interestsHelpText
+        }
+    }
+    
+    private var aboutMeSection: some View {
+        Section(header: Text("About Me")) {
+            TextField("Tell us about your dog (optional)", text: $aboutMe, axis: .vertical)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .lineLimit(3...10)
+            
+            Text("Share what makes your dog special")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private var healthcareSection: some View {
+        Section(header: Text("Healthcare (Optional)")) {
+            VStack(alignment: .leading, spacing: 16) {
+                // Weight Section
+                Group {
+                    Text("Weight")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    TextField("Weight (kg)", text: $weightKg)
+                        .keyboardType(.decimalPad)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+                
+                Divider()
+                
+                // Vaccination Section
+                Group {
+                    Text("Vaccination")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    TextField("Vaccine Name", text: $vaccinationName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    
+                    TextField("Veterinarian Name", text: $veterinarianName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+                
+                Divider()
+                
+                // Grooming Section
+                Group {
+                    Text("Grooming")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    TextField("Grooming Service", text: $groomingService)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    
+                    TextField("Location", text: $groomingLocation)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+                
+                Divider()
+                
+                // Medication Section
+                Group {
+                    Text("Medication")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    TextField("Medication Name", text: $medicationName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    
+                    HStack(spacing: 8) {
+                        TextField("Dosage", text: $medicationDosage)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        
+                        TextField("Frequency", text: $medicationFrequency)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                    }
+                }
+                
+                Divider()
+                
+                // Vet Visit Section
+                Group {
+                    Text("Vet Visit")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    TextField("Visit Purpose", text: $vetVisitPurpose)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    
+                    TextField("Clinic Name", text: $vetClinicName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+                
+                Divider()
+                
+                // General Notes Section
+                Group {
+                    Text("General Health Notes")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    TextField("Additional health notes", text: $generalHealthNotes, axis: .vertical)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .lineLimit(3...6)
+                }
+            }
+            .padding(.vertical, 8)
+
+            Text("Healthcare information helps track your dog's wellbeing. You can always update this later.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private var locationSection: some View {
+        Section(header: Text("Location")) {
+            HStack {
+                Image(systemName: "location.circle.fill")
+                    .foregroundColor(locationManager.userLocation != nil ? .purple : .orange)
+                Text(locationDisplayText)
+                Spacer()
+                Text("📍")
+            }
+            .padding(.vertical, 4)
+            
+            Text(locationDescriptionText)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
+// MARK: - Photo Components
+extension AddDogView {
+    private var photoGrid: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ], spacing: 12) {
+            ForEach(0..<maxPhotos, id: \.self) { index in
+                PhotoUploadBlock(
+                    image: selectedImages[index],
+                    index: index,
+                    onSelect: { currentEditingIndex = index },
+                    onDelete: { deletePhoto(at: index) }
+                )
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var photoRequirementMessage: some View {
+        if !hasMinimumPhotos {
+            HStack {
+                Image(systemName: "info.circle")
+                    .foregroundColor(.orange)
+                Text("Please add at least \(minPhotos) photo to continue")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+            }
+            .padding(.top, 8)
+        }
+    }
+}
+
+// MARK: - Interest Components
+extension AddDogView {
+    private var interestInputRow: some View {
+        HStack {
+            TextField("Add an interest", text: $interestText)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+            
+            Button("Add") {
+                addInterest()
+            }
+            .disabled(interestText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+    
+    @ViewBuilder
+    private var interestsDisplay: some View {
+        if !interests.isEmpty {
+            FlowLayout(spacing: 8) {
+                ForEach(interests, id: \.self) { interest in
+                    InterestChip(
+                        interest: interest,
+                        onDelete: { removeInterest(interest) }
+                    )
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+    
+    @ViewBuilder
+    private var interestsHelpText: some View {
+        if interests.isEmpty {
+            Text("Interests are optional")
+                .foregroundColor(.secondary)
+                .font(.caption)
+        }
+    }
+}
+
+// MARK: - Toolbar
+extension AddDogView {
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button(action: { dismiss() }) {
+                Image(systemName: "xmark")
+            }
+        }
+        
+        ToolbarItem(placement: .topBarTrailing) {
+            Button(action: { saveDog() }) {
+                Image(systemName: "checkmark")
+            }
+            .disabled(!isFormValid)
+            .foregroundColor(isFormValid ? Color.primary : .gray)
+        }
+    }
+}
+
+// MARK: - Computed Properties
+extension AddDogView {
     private var currentLocation: Location {
         if let userLocation = locationManager.userLocation {
-            return Location(latitude: userLocation.coordinate.latitude, longitude: userLocation.coordinate.longitude)
+            return Location(
+                latitude: userLocation.coordinate.latitude,
+                longitude: userLocation.coordinate.longitude
+            )
         } else {
             // Fallback to Los Angeles area if no location available
             return Location(latitude: 34.0522, longitude: -118.2437)
         }
     }
     
-    // Location display properties
     private var locationDisplayText: String {
-        if locationManager.userLocation != nil {
-            return "Current Location"
-        } else {
-            return "Los Angeles Area (Default)"
-        }
+        locationManager.userLocation != nil ? "Current Location" : "Los Angeles Area (Default)"
     }
     
     private var locationDescriptionText: String {
@@ -57,196 +354,62 @@ struct AddDogView: View {
     }
     
     private var hasMinimumPhotos: Bool {
-        let validImages = selectedImages.compactMap { $0 }
-        return validImages.count >= minPhotos
+        selectedImages.compactMap { $0 }.count >= minPhotos
     }
     
     private var isFormValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         age > 0 &&
         hasMinimumPhotos
-        // Interests and AbooutMe are now optional
     }
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Photos")) {
-                    VStack(spacing: 16) {
-                        // Grid of photo upload blocks
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 12) {
-                            ForEach(0..<maxPhotos, id: \.self) { index in
-                                PhotoUploadBlock(
-                                    image: selectedImages[index],
-                                    index: index,
-                                    onSelect: { currentEditingIndex = index },
-                                    onDelete: { deletePhoto(at: index) }
-                                )
-                            }
-                        }
-                        
-                        // Photo requirement message
-                        if !hasMinimumPhotos {
-                            HStack {
-                                Image(systemName: "info.circle")
-                                    .foregroundColor(.orange)
-                                Text("Please add at least \(minPhotos) photo to continue")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                            }
-                            .padding(.top, 8)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                }
-                
-                Section(header: Text("Basic Information")) {
-                    TextField("Dog's Name", text: $name)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
-                    Picker("Breed", selection: $selectedBreed) {
-                        ForEach(DogBreed.sortedBreeds, id: \.self) { breed in
-                            Text(breed.rawValue)
-                                .foregroundColor(Color.primary)
-                                .tag(breed)
-                        }
-                    }
-                    .pickerStyle(.automatic)
-                    
-                    Stepper("Age: \(age) year\(age == 1 ? "" : "s")", value: $age, in: 1...50)
-                }
-                
-                Section(header: Text("Interests")) {
-                    HStack {
-                        TextField("Add an interest", text: $interestText)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                        
-                        Button("Add") {
-                            addInterest()
-                        }
-                        .disabled(interestText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                    
-                    // TODO: fix this, not working
-                    if !interests.isEmpty {
-                        FlowLayout(spacing: 8) {
-                            ForEach(interests, id: \.self) { interest in
-                                InterestChip(
-                                    interest: interest,
-                                    onDelete: {
-                                        removeInterest(interest)
-                                    }
-                                )
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    
-                    if interests.isEmpty {
-                        Text("Interests are optional")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
-                    }
-                }
-                
-                Section(header: Text("About Me")) {
-                    TextField("Tell us about your dog (optional)", text: $aboutMe, axis: .vertical)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .lineLimit(3...10)
-                    
-                    Text("Share what makes your dog special")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Section(header: Text("Location")) {
-                    HStack {
-                        Image(systemName: "location.circle.fill")
-                            .foregroundColor(locationManager.userLocation != nil ? .purple : .orange)
-                        Text(locationDisplayText)
-                        Spacer()
-                        Text("📍")
-                    }
-                    .padding(.vertical, 4)
-                    
-                    Text(locationDescriptionText)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-//            .navigationTitle("Add New Dog")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark")
-                    }
-                }
-                
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {
-                        saveDog()
-                    }) {
-                        Image(systemName: "checkmark")
-                    }
-                    .disabled(!isFormValid)
-                    .foregroundColor(isFormValid ? Color.primary : .gray)
-                }
-            }
-            .photosPicker(
-                isPresented: Binding(
-                    get: { currentEditingIndex != nil },
-                    set: { if !$0 { currentEditingIndex = nil } }
-                ),
-                selection: Binding(
-                    get: { 
-                        if let index = currentEditingIndex {
-                            return selectedItems[index]
-                        }
-                        return nil
-                    },
-                    set: { newValue in
-                        if let index = currentEditingIndex {
-                            selectedItems[index] = newValue
-                            
-                            // Process the selected image
-                            if let item = newValue {
-                                Task {
-                                    if let data = try? await item.loadTransferable(type: Data.self),
-                                       let uiImage = UIImage(data: data) {
-                                        // Resize image to reasonable size
-                                        let resizedImage = uiImage.resized(toWidth: 1000)
-                                        selectedImages[index] = resizedImage
-                                    }
-                                }
-                            }
-                        }
-                    }
-                ),
-                matching: .images
-            )
-        }
+}
 
+// MARK: - Photo Picker Bindings
+extension AddDogView {
+    private var photosPickerBinding: Binding<Bool> {
+        Binding(
+            get: { currentEditingIndex != nil },
+            set: { if !$0 { currentEditingIndex = nil } }
+        )
     }
     
+    private var selectedItemBinding: Binding<PhotosPickerItem?> {
+        Binding(
+            get: {
+                guard let index = currentEditingIndex else { return nil }
+                return selectedItems[index]
+            },
+            set: { newValue in
+                guard let index = currentEditingIndex else { return }
+                selectedItems[index] = newValue
+                
+                if let item = newValue {
+                    Task {
+                        if let data = try? await item.loadTransferable(type: Data.self),
+                           let uiImage = UIImage(data: data) {
+                            let resizedImage = uiImage.resized(toWidth: 1000)
+                            selectedImages[index] = resizedImage
+                        }
+                    }
+                }
+            }
+        )
+    }
+}
+
+// MARK: - Helper Methods
+extension AddDogView {
     private func deletePhoto(at index: Int) {
-        // TODO: right now it removes all photos not just one
         selectedItems[index] = nil
         selectedImages[index] = nil
     }
     
     private func addInterest() {
         let trimmedInterest = interestText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedInterest.isEmpty && !interests.contains(trimmedInterest) {
-            interests.append(trimmedInterest)
-            interestText = ""
-        }
+        guard !trimmedInterest.isEmpty && !interests.contains(trimmedInterest) else { return }
+        
+        interests.append(trimmedInterest)
+        interestText = ""
     }
     
     private func removeInterest(_ interest: String) {
@@ -255,12 +418,12 @@ struct AddDogView: View {
     
     private func saveDog() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Filter out nil images
         let validImages = selectedImages.compactMap { $0 }
-        let aboutMeString = aboutMe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : aboutMe.trimmingCharacters(in: .whitespacesAndNewlines)
+        let aboutMeString = aboutMe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?
+            nil : aboutMe.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        viewModel.addDog(
+        // Save dog profile
+        dogProfileViewModel.addDog(
             name: trimmedName,
             breed: selectedBreed,
             age: age,
@@ -269,17 +432,150 @@ struct AddDogView: View {
             photos: validImages,
             aboutMe: aboutMeString,
             ownerName: authService.currentUser!.name,
-//            ownerName: ownerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : ownerName.trimmingCharacters(in: .whitespacesAndNewlines),
             ownerId: authService.currentUser!.id,
-            // TODO: toggle button to set dog's online status upon their choose,
-            // mention they can change the status in setting as well, or add a button on the "My dog" page to easily toggle
-            // Hardcode to online for now
             isOnline: true
         )
+        
+        // Save health info if provided
+        Task {
+            await saveHealthcareData()
+        }
+        
         dismiss()
+    }
+    
+    // MARK: - Updated methods for AddDogView
+    private func saveHealthcareData() async {
+        var vaccination: VaccinationRecord? = nil
+        var grooming: GroomingAppointment? = nil
+        var medication: Medication? = nil
+        var vetAppointment: VetAppointment? = nil
+        
+        // Create vaccination record if provided
+        if !vaccinationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            vaccination = VaccinationRecord(
+                vaccineName: vaccinationName,
+                vaccinationDate: Date(),
+                expirationDate: Date().addingTimeInterval(365 * 24 * 60 * 60), // 1 year default
+                veterinarianName: veterinarianName.isEmpty ? nil : veterinarianName,
+                clinicName: nil,
+                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes
+            )
+        }
+        
+        // Create grooming record if provided
+        if !groomingService.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            grooming = GroomingAppointment(
+                appointmentDate: Date(),
+                groomingService: groomingService,
+                location: groomingLocation.isEmpty ? nil : groomingLocation,
+                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes,
+                isCompleted: true
+            )
+        }
+        
+        // Create medication record if provided
+        if !medicationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            medication = Medication(
+                medicationName: medicationName,
+                dosage: medicationDosage.isEmpty ? "As prescribed" : medicationDosage,
+                frequency: medicationFrequency.isEmpty ? "As needed" : medicationFrequency,
+                startDate: Date(),
+                endDate: nil, // Open-ended unless specified
+                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes
+            )
+        }
+        
+        // Create vet appointment record if provided
+        if !vetVisitPurpose.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            vetAppointment = VetAppointment(
+                purpose: vetVisitPurpose,
+                appointmentDate: Date(),
+                veterinarianName: veterinarianName.isEmpty ? nil : veterinarianName,
+                clinicName: vetClinicName.isEmpty ? nil : vetClinicName,
+                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes,
+                isCompleted: true
+            )
+        }
+        
+        // Save all health data in one API call
+        await dogHealthViewModel.addHealthDataFromForm(
+            weight: Double(weightKg),
+            weightNotes: generalHealthNotes.isEmpty ? nil : generalHealthNotes,
+            vaccination: vaccination,
+            grooming: grooming,
+            medication: medication,
+            vetAppointment: vetAppointment
+        )
+    }
+
+    // MARK: - Updated methods for EditDogView
+    private func updateHealthData() async {
+        var vaccination: VaccinationRecord? = nil
+        var grooming: GroomingAppointment? = nil
+        var medication: Medication? = nil
+        var vetAppointment: VetAppointment? = nil
+        
+        // Create vaccination record if provided
+        if !vaccinationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            vaccination = VaccinationRecord(
+                vaccineName: vaccinationName,
+                vaccinationDate: Date(),
+                expirationDate: Date().addingTimeInterval(365 * 24 * 60 * 60), // 1 year default
+                veterinarianName: veterinarianName.isEmpty ? nil : veterinarianName,
+                clinicName: nil,
+                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes
+            )
+        }
+        
+        // Create grooming record if provided
+        if !groomingService.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            grooming = GroomingAppointment(
+                appointmentDate: Date(),
+                groomingService: groomingService,
+                location: groomingLocation.isEmpty ? nil : groomingLocation,
+                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes,
+                isCompleted: true
+            )
+        }
+        
+        // Create medication record if provided
+        if !medicationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            medication = Medication(
+                medicationName: medicationName,
+                dosage: medicationDosage.isEmpty ? "As prescribed" : medicationDosage,
+                frequency: medicationFrequency.isEmpty ? "As needed" : medicationFrequency,
+                startDate: Date(),
+                endDate: nil, // Open-ended unless specified
+                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes
+            )
+        }
+        
+        // Create vet appointment record if provided
+        if !vetVisitPurpose.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            vetAppointment = VetAppointment(
+                purpose: vetVisitPurpose,
+                appointmentDate: Date(),
+                veterinarianName: veterinarianName.isEmpty ? nil : veterinarianName,
+                clinicName: vetClinicName.isEmpty ? nil : vetClinicName,
+                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes,
+                isCompleted: true
+            )
+        }
+        
+        // Save all health data in one API call
+        await dogHealthViewModel.addHealthDataFromForm(
+            weight: Double(weightKg),
+            weightNotes: generalHealthNotes.isEmpty ? nil : generalHealthNotes,
+            vaccination: vaccination,
+            grooming: grooming,
+            medication: medication,
+            vetAppointment: vetAppointment
+        )
     }
 }
 
+// MARK: - Supporting Views
 struct PhotoUploadBlock: View {
     let image: UIImage?
     let index: Int
@@ -289,48 +585,48 @@ struct PhotoUploadBlock: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             if let image = image {
-                // Show the selected image
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 100, height: 100)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .background(Color(.systemBackground))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.purple, lineWidth: 2)
-                    )
-                    .onTapGesture {
-                        onSelect()
-                    }
-                
-                // Delete button
-                Button(action: onDelete) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(.red)
-                        .background(Circle().fill(Color.white))
-                }
-                .offset(x: 6, y: -6)
+                selectedImageView(image: image)
+                deleteButton
             } else {
-                // Show the empty placeholder
-                VStack {
-                    Image(systemName: "photo.badge.plus")
-                        .font(.system(size: 30))
-                        .foregroundColor(Color.pink.opacity(0.3))
-                }
-                .frame(width: 100, height: 100)
-                .background(Color.purple.opacity(0.3))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-//                .overlay(
-//                    RoundedRectangle(cornerRadius: 10)
-//                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-//                )
-                .onTapGesture {
-                    onSelect()
-                }
+                placeholderView
             }
         }
+    }
+    
+    private func selectedImageView(image: UIImage) -> some View {
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 100, height: 100)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(Color(.systemBackground))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.purple, lineWidth: 2)
+            )
+            .onTapGesture(perform: onSelect)
+    }
+    
+    private var deleteButton: some View {
+        Button(action: onDelete) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 22))
+                .foregroundColor(.red)
+                .background(Circle().fill(Color.white))
+        }
+        .offset(x: 6, y: -6)
+    }
+    
+    private var placeholderView: some View {
+        VStack {
+            Image(systemName: "photo.badge.plus")
+                .font(.system(size: 30))
+                .foregroundColor(Color.pink.opacity(0.3))
+        }
+        .frame(width: 100, height: 100)
+        .background(Color.purple.opacity(0.3))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .onTapGesture(perform: onSelect)
     }
 }
 
@@ -358,5 +654,8 @@ struct InterestChip: View {
 }
 
 #Preview {
-    AddDogView(viewModel: DogProfileViewModel())
+    AddDogView(
+        dogProfileViewModel: DogProfileViewModel(),
+        dogHealthViewModel: DogHealthViewModel()
+    )
 }

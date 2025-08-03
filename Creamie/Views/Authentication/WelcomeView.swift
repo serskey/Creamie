@@ -20,15 +20,13 @@ struct WelcomeView: View {
                 
                 // App Logo/Title
                 VStack(spacing: 16) {
-                    Image(systemName: "pawprint.circle.fill")
+                    Image("Splash")
+                        .resizable()
+                        .scaledToFit() 
                         .font(.system(size: 100))
                         .foregroundColor(.purple)
                     
-//                    FurryTextCanvas(text: "DogConnect")
-//                        .foregroundColor(.primary)
-//                        .font(.largeTitle.bold())
-                    
-                    Text("DogConnect")
+                    Text("Creamie")
                         .font(.largeTitle.bold())
                         .foregroundColor(.primary)
                     

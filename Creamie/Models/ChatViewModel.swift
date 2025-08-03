@@ -8,6 +8,8 @@ struct Chat: Identifiable, Hashable {
     let otherDogId: UUID
     let otherDogName: String
     let otherDogAvatar: String
+    let currentDogId: UUID?
+    let currentDogName: String?
     var createdAt: Date?
     var messages: [Message]?
     var lastMessageDate: Date = Date()
@@ -38,12 +40,13 @@ extension Chat {
              otherDogId: UUID(),
              otherDogName: "",
              otherDogAvatar: "",
+             currentDogId: nil,
+             currentDogName: nil,
              createdAt: Date(),
              messages: []
         )
     }
 }
-
 
 struct SupabaseChat: Decodable {
     let id: UUID
@@ -51,9 +54,10 @@ struct SupabaseChat: Decodable {
     let other_dog_id: UUID
     let other_dog_name: String
     let other_dog_avatar: String
+    let current_dog_id: UUID?
+    let current_dog_name: String?
     let inserted_at: Date
 }
-
 
 // Represents an individual message in a chat
 struct Message: Identifiable {
@@ -92,25 +96,34 @@ class ChatViewModel: ObservableObject {
         }
     }
 
-    func findOrCreateChat(for selectedDog: Dog) async -> Chat {
+    func findOrCreateChatBetweenDogs(fromDog: Dog, toDog: Dog) async -> Chat {
         let currentUserId = authService.currentUser!.id
-        // fetch all conversations by userId
+        
+        // Fetch all conversations for current user's dogs
         await fetchChatsByCurrentUserId(currentUserId: currentUserId)
         
-        // existing conversation
-        if let existing = self.chats.first(where: { $0.otherDogId == selectedDog.id }) {
-            print("There is already a conversation \(existing.id) between user \(currentUserId) and dog \(selectedDog.id)")
+        // Check if conversation already exists between these two specific dogs
+        if let existing = self.chats.first(where: {
+            ($0.currentDogId == fromDog.id && $0.otherDogId == toDog.id) ||
+            ($0.currentDogId == toDog.id && $0.otherDogId == fromDog.id)
+        }) {
+            print("Found existing conversation \(existing.id) between \(fromDog.name) and \(toDog.name)")
             return existing
         }
 
-        // create new conversation
+        // Create new conversation between dogs
         let chatId = UUID()
         let newChat = Chat(
             id: chatId,
             currentUserId: currentUserId,
-            otherDogId: selectedDog.id,
-            otherDogName: selectedDog.name,
-            otherDogAvatar: selectedDog.photos[0]
+            otherDogId: toDog.id,
+            otherDogName: toDog.name,
+            otherDogAvatar: toDog.photos.first ?? "",
+            currentDogId: fromDog.id,
+            currentDogName: fromDog.name,
+            createdAt: Date(),
+            messages: [],
+            lastMessageDate: Date()
         )
             
         // Insert new chat on Supabase
@@ -122,13 +135,14 @@ class ChatViewModel: ObservableObject {
                     "current_user_id": newChat.currentUserId.uuidString,
                     "other_dog_id": newChat.otherDogId.uuidString,
                     "other_dog_name": newChat.otherDogName,
-                    "other_dog_avatar": newChat.otherDogAvatar
+                    "other_dog_avatar": newChat.otherDogAvatar,
+                    "current_dog_id": fromDog.id.uuidString,
+                    "current_dog_name": fromDog.name
                 ])
                 .execute()
             
-            // Only append locally after successful insert
             chats.append(newChat)
-            print("Created new conversation \(chatId) between user \(currentUserId) and dog \(selectedDog.id)")
+            print("Created new conversation \(chatId) between \(fromDog.name) and \(toDog.name)")
         } catch {
             print("❌ Failed to create chat \(newChat.id) on Supabase:", error)
         }
@@ -140,10 +154,28 @@ class ChatViewModel: ObservableObject {
         let currentUserId = authService.currentUser!.id
         
         do {
+            // First, get all dogs owned by the current user
+            let dogsResponse = try await supabase
+                .from("dogs")
+                .select("id")
+                .eq("owner_id", value: currentUserId)
+                .execute()
+            
+            let dogsData = dogsResponse.data
+            let userDogIds = try JSONDecoder().decode([DogId].self, from: dogsData).map { $0.id }
+            
+            // Now fetch chats where:
+            // 1. Current user started the chat (current_user_id), OR
+            // 2. Someone wants to chat with any of current user's dogs (other_dog_id)
+            var orConditions = ["current_user_id.eq.\(currentUserId)"]
+            for dogId in userDogIds {
+                orConditions.append("other_dog_id.eq.\(dogId)")
+            }
+            
             let response = try await supabase
                 .from("chats")
                 .select("*")
-                .eq("current_user_id", value: currentUserId)
+                .or(orConditions.joined(separator: ","))
                 .execute()
             
             let data = response.data
@@ -156,20 +188,43 @@ class ChatViewModel: ObservableObject {
             let decoded = try decoder.decode([SupabaseChat].self, from: data)
 
             let loadedChats = decoded.map { supaChat -> Chat in
-                return Chat(
-                    id: supaChat.id,
-                    currentUserId: supaChat.current_user_id,
-                    otherDogId: supaChat.other_dog_id,
-                    otherDogName: supaChat.other_dog_name,
-                    otherDogAvatar: supaChat.other_dog_avatar,
-                    messages: [],
-                    lastMessageDate: supaChat.inserted_at
-                )
+                let isCurrentUserTheSender = supaChat.current_user_id == currentUserId
+                
+                if isCurrentUserTheSender {
+                    // Current user started the chat, use the stored info
+                    return Chat(
+                        id: supaChat.id,
+                        currentUserId: currentUserId,
+                        otherDogId: supaChat.other_dog_id,
+                        otherDogName: supaChat.other_dog_name,
+                        otherDogAvatar: supaChat.other_dog_avatar,
+                        currentDogId: supaChat.current_dog_id,
+                        currentDogName: supaChat.current_dog_name,
+                        createdAt: supaChat.inserted_at,
+                        messages: [],
+                        lastMessageDate: supaChat.inserted_at
+                    )
+                } else {
+                    // Someone else started a chat with current user's dog
+                    // The "other" dog is actually the sender's dog, "current" dog is yours
+                    return Chat(
+                        id: supaChat.id,
+                        currentUserId: currentUserId,
+                        otherDogId: supaChat.current_dog_id ?? supaChat.current_user_id,
+                        otherDogName: supaChat.current_dog_name ?? "Other Dog",
+                        otherDogAvatar: "", // TODO: Fetch sender's dog avatar
+                        currentDogId: supaChat.other_dog_id,
+                        currentDogName: supaChat.other_dog_name,
+                        createdAt: supaChat.inserted_at,
+                        messages: [],
+                        lastMessageDate: supaChat.inserted_at
+                    )
+                }
             }
 
             self.chats = loadedChats
             
-            print("📥 Loaded \(self.chats.count) conversations from user \(currentUserId)")
+            print("📥 Loaded \(self.chats.count) conversations for user \(currentUserId)")
         } catch {
             print("❌ Failed to load chats: \(error)")
         }
@@ -302,5 +357,9 @@ class ChatViewModel: ObservableObject {
 
             await channel.subscribe()
         }
+    }
+    
+    private struct DogId: Decodable {
+        let id: UUID
     }
 }

@@ -153,6 +153,19 @@ class DogProfileService {
         return response
     }
     
+    func updateDog(updateDogRequest: UpdateDogProfileRequest) async throws -> UpdateDogProfileResponse {
+        
+        let response = try await apiService.request(
+            endpoint: "/dogs/update",
+            method: .PUT,
+            body: updateDogRequest,
+            responseType: UpdateDogProfileResponse.self
+        )
+        
+        return response
+
+    }
+    
     func deleteDog(id: UUID, photos: [String]) async throws -> DeleteDogResponse {
         let request = DeleteDogRequest(
             dogId: id,
@@ -273,28 +286,7 @@ class DogProfileService {
         return response
 
     }
-    
-    func updateDog(updateDogRequest: UpdateDogProfileRequest) async throws -> UpdateDogProfileResponse {
-//        let request = UpdateDogProfileRequest(
-//            dogId: updateDogRequest.dogId,
-//            name: updateDogRequest.name,
-//            breed: updateDogRequest.breed,
-//            age: updateDogRequest.age,
-//            interests: updateDogRequest.interests,
-//            photos: updateDogRequest.photos,
-//            aboutMe: updateDogRequest.aboutMe
-//        )
-        
-        let response = try await apiService.request(
-            endpoint: "/dogs/update",
-            method: .PUT,
-            body: updateDogRequest,
-            responseType: UpdateDogProfileResponse.self
-        )
-        
-        return response
 
-    }
 }
 
 // MARK: - Helper Extensions

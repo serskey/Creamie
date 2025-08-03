@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var isLoading = true
     @EnvironmentObject private var locationManager: LocationManager
     @EnvironmentObject private var chatViewModel: ChatViewModel
+    @EnvironmentObject private var dogProfileViewModel: DogProfileViewModel
     @State private var showingLocationAlert = false
     @State private var showTabBar = true
     
@@ -63,7 +64,8 @@ struct ContentView: View {
                 case 0:
                     MapView(selectedTab: $selectedTab,
                             selectedChatId: $selectedChatId)
-                        .id(mapViewId)
+                    .environmentObject(dogProfileViewModel)
+                    .id(mapViewId)
                 case 1:
                     DogProfilesView()
                         .id(dogProfileViewId)
@@ -76,8 +78,10 @@ struct ContentView: View {
                     SettingsView()
                         .environmentObject(authService)
                 default:
-                    MapView(selectedTab: $selectedTab, selectedChatId: $selectedChatId)
-                        .id(mapViewId)
+                    MapView(selectedTab: $selectedTab,
+                            selectedChatId: $selectedChatId)
+                    .environmentObject(dogProfileViewModel)
+                    .id(mapViewId)
                 }
             }
             
@@ -149,4 +153,5 @@ struct ContentView: View {
     ContentView()
         .environmentObject(LocationManager())
         .environmentObject(ChatViewModel())
+        .environmentObject(DogProfileViewModel())
 }

@@ -102,6 +102,7 @@ struct CreamieApp: App {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var chatViewModel = ChatViewModel()
     @StateObject private var authService = AuthenticationService.shared
+    @StateObject private var dogProfileViewModel = DogProfileViewModel()
     
     var body: some Scene {
         WindowGroup {
@@ -109,6 +110,7 @@ struct CreamieApp: App {
                 .environmentObject(locationManager)
                 .environmentObject(chatViewModel)
                 .environmentObject(authService)
+                .environmentObject(dogProfileViewModel)
                 .task {
                     await supabase.realtimeV2.connect()
                 }

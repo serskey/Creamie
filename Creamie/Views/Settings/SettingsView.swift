@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var showingLogoutAlert = false
     @StateObject private var dogProfileViewModel = DogProfileViewModel()
     @AppStorage("isOnline") private var isOnline = true
+    @Environment(\.openURL) private var openURL
     
     
     var body: some View {

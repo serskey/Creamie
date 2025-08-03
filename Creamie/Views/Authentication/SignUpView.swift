@@ -64,7 +64,7 @@ struct SignUpView: View {
                     
                     // Phone Number Field
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Phone Number")
+                        Text("Phone Number(Optional)")
                             .font(.subheadline.bold())
                             .foregroundColor(.primary)
                         

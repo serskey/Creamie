@@ -9,6 +9,7 @@ struct MapView: View {
     
     // MARK: - Environment & Services
     @EnvironmentObject private var locationManager: LocationManager
+    @EnvironmentObject var dogProfileViewModel: DogProfileViewModel
     @StateObject private var viewModel = MapViewModel()
     
     // MARK: - UI State
@@ -59,6 +60,7 @@ struct MapView: View {
             MapDogProfileView(selectedDog: dog,
                               selectedTab: $selectedTab,
                               selectedChatId: $selectedChatId)
+            .environmentObject(dogProfileViewModel)
             .presentationDetents([.medium])
             .presentationBackgroundInteraction(.enabled)
         }
