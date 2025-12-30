@@ -115,7 +115,11 @@ private extension MapView {
                 .tag(dog)
             }
         }
-        .mapStyle(.standard)
+        .mapStyle(
+            .standard(
+                elevation: .flat,
+                pointsOfInterest: .excludingAll)
+        )
         .mapControlVisibility(.hidden)
         .onMapCameraChange { context in
             handleCameraChange(context)
@@ -308,6 +312,8 @@ private extension MapView {
             position = .userLocation(fallback: .automatic)
             isTrackingUserLocation = true
         }
+        
+        viewModel.fetchNearbyDogs()
         
 //        // clear sermatic search when back to my location
 //        if isSearchActive {

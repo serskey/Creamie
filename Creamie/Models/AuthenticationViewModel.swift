@@ -45,6 +45,17 @@ struct User: Codable, Identifiable {
     }
 }
 
+extension User {
+    static let mock = User(
+        id: UUID(),
+        name: "Creamie Doggo",
+        email: "creamie@example.com",
+        phoneNumber: "123-456-7890",
+        photos: nil,
+        createdAt: "2025-01-01T00:00:00Z",
+        updatedAt: "2025-01-01T00:00:00Z"
+    )
+}
 
 @MainActor
 class AuthenticationViewModel: ObservableObject {

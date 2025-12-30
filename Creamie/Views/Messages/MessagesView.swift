@@ -45,7 +45,7 @@ struct MessagesView: View {
                                     chatToDelete = chat
                                     showingDeleteConfirmation = true
                                 } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    Label("", systemImage: "trash")
                                 }
                             }
                     }

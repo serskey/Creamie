@@ -22,7 +22,7 @@ struct EditDogView: View {
     
     // MARK: - Interests State
     @State private var interestText: String = ""
-    @State private var interests: [String]
+    @State private var interests: [String] = []
     
     // MARK: - Healthcare State
     @State private var weightKg: String = ""
@@ -303,8 +303,13 @@ extension EditDogView {
             TextField("Add an interest", text: $interestText)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
             
-            Button("Add") {
+            Button(action: {
                 addInterest()
+            }) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.purple)
+                    .accessibilityLabel("Add Interest")
             }
             .disabled(interestText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
@@ -313,13 +318,11 @@ extension EditDogView {
     @ViewBuilder
     private var interestsDisplay: some View {
         if !interests.isEmpty {
-            FlowLayout(spacing: 8) {
-                ForEach(interests, id: \.self) { interest in
-                    InterestChip(
-                        interest: interest,
-                        onDelete: { removeInterest(interest) }
-                    )
-                }
+            SimpleFlowLayout(items: interests) { interest in
+                InterestChip(
+                    interest: interest,
+                    onDelete: { removeInterest(interest) }
+                )
             }
             .padding(.vertical, 4)
         }
@@ -573,6 +576,65 @@ extension EditDogView {
     }
 }
 
+// MARK: - Simple Flow Layout
+private struct SimpleFlowLayoutEdit<Data: RandomAccessCollection, Content: View>: View where Data.Element: Hashable {
+    let items: Data
+    let content: (Data.Element) -> Content
+    
+    @State private var totalHeight = CGFloat.zero
+    
+    var body: some View {
+        VStack {
+            GeometryReader { geometry in
+                self.generateContent(in: geometry)
+            }
+        }
+        .frame(height: totalHeight)
+    }
+    
+    private func generateContent(in geometry: GeometryProxy) -> some View {
+        var width = CGFloat.zero
+        var height = CGFloat.zero
+        
+        return ZStack(alignment: .topLeading) {
+            ForEach(Array(items), id: \.self) { item in
+                content(item)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 4)
+                    .alignmentGuide(.leading, computeValue: { d in
+                        if (abs(width - d.width) > geometry.size.width) {
+                            width = 0
+                            height -= d.height
+                        }
+                        let result = width
+                        if item == items.last {
+                            width = 0
+                        } else {
+                            width -= d.width
+                        }
+                        return result
+                    })
+                    .alignmentGuide(.top, computeValue: { d in
+                        let result = height
+                        if item == items.last {
+                            height = 0
+                        }
+                        return result
+                    })
+            }
+        }
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .preference(key: ViewHeightKey.self, value: geo.frame(in: .local).size.height)
+            }
+        )
+        .onPreferenceChange(ViewHeightKey.self) { value in
+            self.totalHeight = value
+        }
+    }
+}
+
 // MARK: - Supporting Views
 struct PhotoSlotBlock: View {
     let index: Int
@@ -665,4 +727,6 @@ struct PhotoSlotBlock: View {
             updatedAt: Date()
         )
     )
+    .environmentObject(LocationManager())
+    .environmentObject(AuthenticationService.mock)
 }

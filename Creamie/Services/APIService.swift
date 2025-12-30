@@ -3,11 +3,13 @@ import Combine
 
 // MARK: - API Configuration
 struct APIConfig {
-    // http://192.168.0.101:9000 is for physical iPhone testing
-    // ifconfig | grep "inet " | grep -v 127.0.0.1
-    // change back to `http://127.0.0.1:9000` for local testing
-    static let baseURL = "http://127.0.0.1:9000"
-//    static let baseURL = "http://192.168.0.101:9000"
+    /**
+     http://192.168.0.101:9000 is for physical iPhone testing
+     ifconfig | grep "inet " | grep -v 127.0.0.1
+     change back to `http://127.0.0.1:9000` for local testing
+     */
+//    static let baseURL = "http://127.0.0.1:9000"
+    static let baseURL = "http://192.168.0.101:9000"
     static let timeout: TimeInterval = 30.0
 }
 

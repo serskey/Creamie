@@ -42,8 +42,11 @@ struct ChatView: View {
             Task {
                 await chatViewModel.fetchMessagesByChatId(for: chatId)
             }
-            // Subscribe to messages for this chat
-            chatViewModel.subscribeToMessages(for: chatId)
+            
+            Task {
+                // Subscribe to messages for this chat
+                await chatViewModel.subscribeToMessages(for: chatId)
+            }
         }
         .onDisappear {
             // Show tab bar when this view disappears (going back)
@@ -128,35 +131,29 @@ struct ChatView: View {
 
                         HStack(alignment: .bottom, spacing: 8) {
                             if !isFromCurrentUser {
-                                if isFirst {
-                                    // Avatar on first of incoming group
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 24, height: 24)
-                                } else {
-                                    Spacer().frame(width: 24)
-                                }
-                            }
-
-                            if isFromCurrentUser {
+                                AcatarView(photoName: chat.otherDogAvatar)
+                                    .frame(width: 40, height: 40)
+                                    .scaleEffect(0.7)
+                                    .zIndex(1)
+                                
+                                ModernMessageBubble(message: message,
+                                                    isFirstInGroup: isFirst,
+                                                    isLastInGroup: isLast)
+                                
                                 Spacer()
-                            }
-
-                            NewFigmaMessageBubble(
-                                text: message.text,
-                                isFromCurrentUser: isFromCurrentUser,
-                                isFirstInGroup: isFirst,
-                                isLastInGroup: isLast
-                            )
-
-                            if !isFromCurrentUser {
+                                
+                                
+                            } else {
                                 Spacer()
+                                
+                                ModernMessageBubble(message: message,
+                                                    isFirstInGroup: isFirst,
+                                                    isLastInGroup: isLast)
+                                
+                                AcatarView(photoName: selectedDog?.photos.first ?? "https://bibnhxcfmdpwqcfftgtj.supabase.co/storage/v1/object/public/dog-photos/2867871c-2449-445a-bebb-2cdb7525ab99_bd256857-4f3e-4152-8348-0fd4330dea24.jpg")
+                                    .frame(width: 40, height: 40)
+                                    .scaleEffect(0.7)
+                                    .zIndex(1)
                             }
                         }
                         .padding(.horizontal, 16)
@@ -218,8 +215,6 @@ struct ChatView: View {
                         // Sending Messages Button
                         Button(action: {
                             guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                            
-                            print("Sending messageText: \(messageText)")
     
                             chatViewModel.sendMessage(messageText, in: chat)
                             messageText = ""
@@ -250,92 +245,4 @@ struct ChatView: View {
         .frame(height: 82)
     }
     
-}
-
-// MARK: - Message Bubble Component
-struct NewFigmaMessageBubble: View {
-    let text: String
-    let isFromCurrentUser: Bool
-    let isFirstInGroup: Bool
-    let isLastInGroup: Bool
-    
-    private var cornerRadius: RectangleCornerRadii {
-        if isFromCurrentUser {
-            // Sender bubbles (right side)
-            if isFirstInGroup && isLastInGroup {
-                return RectangleCornerRadii(
-                    topLeading: 18,
-                    bottomLeading: 18,
-                    bottomTrailing: 18,
-                    topTrailing: 18
-                )
-            } else if isFirstInGroup {
-                return RectangleCornerRadii(
-                    topLeading: 18,
-                    bottomLeading: 18,
-                    bottomTrailing: 4,
-                    topTrailing: 18
-                )
-            } else if isLastInGroup {
-                return RectangleCornerRadii(
-                    topLeading: 18,
-                    bottomLeading: 18,
-                    bottomTrailing: 18,
-                    topTrailing: 4
-                )
-            } else {
-                return RectangleCornerRadii(
-                    topLeading: 18,
-                    bottomLeading: 18,
-                    bottomTrailing: 4,
-                    topTrailing: 4
-                )
-            }
-        } else {
-            // Recipient bubbles (left side)
-            if isFirstInGroup && isLastInGroup {
-                return RectangleCornerRadii(
-                    topLeading: 18,
-                    bottomLeading: 18,
-                    bottomTrailing: 18,
-                    topTrailing: 18
-                )
-            } else if isFirstInGroup {
-                return RectangleCornerRadii(
-                    topLeading: 18,
-                    bottomLeading: 18,
-                    bottomTrailing: 18,
-                    topTrailing: 4
-                )
-            } else if isLastInGroup {
-                return RectangleCornerRadii(
-                    topLeading: 4,
-                    bottomLeading: 18,
-                    bottomTrailing: 18,
-                    topTrailing: 18
-                )
-            } else {
-                return RectangleCornerRadii(
-                    topLeading: 4,
-                    bottomLeading: 18,
-                    bottomTrailing: 18,
-                    topTrailing: 4
-                )
-            }
-        }
-    }
-    
-    var body: some View {
-        Text(text)
-            .font(.system(size: 14, weight: .medium))
-            .foregroundColor(.primary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .glassEffect(.clear.interactive())
-            .background(
-                UnevenRoundedRectangle(cornerRadii: cornerRadius)
-                    .fill(isFromCurrentUser ? Color.pink : Color.purple)
-            )
-            .frame(maxWidth: 247, alignment: isFromCurrentUser ? .trailing : .leading)
-    }
 }

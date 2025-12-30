@@ -68,6 +68,7 @@ struct Message: Identifiable {
 }
 
 struct SupabaseMessagePayload: Decodable {
+    let id: UUID
     let chat_id: UUID
     let sender_id: UUID
     let text: String
@@ -80,7 +81,7 @@ class ChatViewModel: ObservableObject {
 
     private let authService = AuthenticationService.shared
     private let messagesTableName = "messages"
-    private var messageChannel: RealtimeChannelV2?
+    private var activeSubscriptions: [UUID: RealtimeChannelV2] = [:]
     private let chatsTableName = "chats"
     
 
@@ -112,6 +113,7 @@ class ChatViewModel: ObservableObject {
         }
 
         // Create new conversation between dogs
+        print("no existing conversation")
         let chatId = UUID()
         let newChat = Chat(
             id: chatId,
@@ -128,6 +130,7 @@ class ChatViewModel: ObservableObject {
             
         // Insert new chat on Supabase
         do {
+            print("Start insert new chat on Supabase")
             try await supabase
                 .from(chatsTableName)
                 .insert([
@@ -137,7 +140,8 @@ class ChatViewModel: ObservableObject {
                     "other_dog_name": newChat.otherDogName,
                     "other_dog_avatar": newChat.otherDogAvatar,
                     "current_dog_id": fromDog.id.uuidString,
-                    "current_dog_name": fromDog.name
+                    "current_dog_name": fromDog.name,
+                    "current_dog_avatar": fromDog.photos.first ?? ""
                 ])
                 .execute()
             
@@ -304,58 +308,135 @@ class ChatViewModel: ObservableObject {
         }
     }
 
-    func deleteChat(_ chat: Chat) {
-        chats.removeAll { $0.id == chat.id }
-        // TODO: Delete backend
-    }
-
-    func deleteChats(withIds chatIds: Set<UUID>) {
-        chats.removeAll { chatIds.contains($0.id) }
-        // TODO: Delete backend
-    }
-
-    func subscribeToMessages(for chatID: UUID) {
+    func subscribeToMessages(for chatID: UUID) async {
+        print("🔄 Starting subscription for chat: \(chatID)")
         let currentUserId = authService.currentUser!.id
+        print("🔄 Current user ID: \(currentUserId)")
         
+        // Check if already subscribed to this chat
+        if activeSubscriptions[chatID] != nil {
+            print("⚠️ Already subscribed to chat \(chatID)")
+            return
+        }
+        
+        // Create unique channel for this chat
+        let channelName = "chat-\(chatID.uuidString)"
+        print("🔄 Creating channel: \(channelName)")
+        let channel = await supabase.realtimeV2.channel(channelName)
+        
+        // Set up postgres changes listener for ALL messages (no filter)
+        print("🔄 Setting up postgres change listener for ALL messages")
+        let insertions = await channel.postgresChange(
+            InsertAction.self,
+            table: "messages"
+        )
+        
+        // Store the channel reference before subscribing
+        activeSubscriptions[chatID] = channel
+        
+        // Subscribe to the channel
+        print("🔄 Subscribing to channel...")
+        await channel.subscribe()
+        print("✅ Subscribed to messages for chat \(chatID)")
+        
+        // Listen for postgres changes
         Task {
-            let channel = supabase.realtimeV2.channel("public:messages")
-            self.messageChannel = channel
+            print("🔄 Starting to listen for postgres insertions...")
+            for await insertion in insertions {
+                print("📨 POSTGRES: New message insertion detected!")
+//                print("📨 POSTGRES: Insertion details: \(insertion)")
+//                print("📨 POSTGRES: Record: \(insertion.record)")
+                
+                do {
+                    let decoder = JSONDecoder()
+                    let newRecord = try insertion.decodeRecord(
+                        as: SupabaseMessagePayload.self,
+                        decoder: decoder
+                    )
+                    
+                    // Filter messages: only process if it's for this chat and not from current user
+                    guard newRecord.chat_id == chatID else {
+                        print("🚫 POSTGRES: Wrong chat - Expected: \(chatID), Got: \(newRecord.chat_id)")
+                        continue
+                    }
+                    
+                    guard newRecord.sender_id != currentUserId else {
+                        print("🚫 POSTGRES: Message from current user - ignoring")
+                        continue
+                    }
+                    
+                    print("✅ POSTGRES: Processing valid incoming message \(newRecord.id)")
+                    await handleIncomingMessage(newRecord)
+                    
+                } catch {
+                    print("❌ POSTGRES: Failed to decode message record: \(error)")
+                    print("❌ POSTGRES: Raw record data: \(insertion.record)")
+                }
+            }
+        }
+        
 
-            Task {
-                for await insert in channel.postgresChange(
-                    InsertAction.self,
-                    schema: "public",
-                    table: "messages",
-                    filter: "chat_id=eq.\(chatID.uuidString)"
-                ) {
-                    do {
-                        let newRecord = try insert.decodeRecord(
-                            as: SupabaseMessagePayload.self,
-                            decoder: JSONDecoder()
-                        )
-
-                        let newMessage = Message(
-                            text: newRecord.text,
-                            isFromCurrentUser: newRecord.sender_id == currentUserId,
-                            timestamp: ISO8601DateFormatter().date(from: newRecord.created_at) ?? Date()
-                        )
-
-                        if let index = self.chats.firstIndex(where: { $0.id == chatID }) {
-                            if chats[index].messages == nil {
-                                chats[index].messages = []
-                            }
-                            
-                            self.chats[index].messages?.append(newMessage)
-                            self.chats[index].lastMessageDate = newMessage.timestamp
-                            self.chats.sort { $0.lastMessageDate > $1.lastMessageDate }
-                        }
-                    } catch {
-                        print("❌ Failed to decode message:", error)
+    }
+    
+    private func handleIncomingMessage(_ messagePayload: SupabaseMessagePayload) async {
+//        print("🔄 Processing incoming message: \(messagePayload.text)")
+        
+        let newMessage = Message(
+            text: messagePayload.text,
+            isFromCurrentUser: false,
+            timestamp: ISO8601DateFormatter().date(from: messagePayload.created_at) ?? Date()
+        )
+        
+        // Find the chat and add the message
+        if let index = self.chats.firstIndex(where: { $0.id == messagePayload.chat_id }) {
+            // Initialize messages array if nil
+            if self.chats[index].messages == nil {
+                self.chats[index].messages = []
+            }
+            
+            // Check for duplicates based on message ID
+            let messageExists = self.chats[index].messages?.contains { $0.id == newMessage.id } ?? false
+            
+            if !messageExists {
+                self.chats[index].messages!.append(newMessage)
+                self.chats[index].lastMessageDate = newMessage.timestamp
+                
+                // Re-sort chats by last message date
+                self.chats.sort { $0.lastMessageDate > $1.lastMessageDate }
+                
+                print("✅ Added new message to chat \(messagePayload.chat_id)")
+            } else {
+                print("⚠️ Duplicate message filtered out: \(newMessage.id)")
+            }
+        } else {
+            print("❌ Chat not found for message: \(messagePayload.chat_id)")
+        }
+    }
+    
+    func deleteChat(_ chat: Chat) {
+        // Remove from local state first
+        chats.removeAll { $0.id == chat.id }
+        
+        // Delete from backend
+        Task {
+            do {
+                _ = try await supabase
+                    .from(chatsTableName)
+                    .delete()
+                    .eq("id", value: chat.id.uuidString)
+                    .execute()
+                
+                print("🗑️ Successfully deleted chat \(chat.id) and its messages")
+            } catch {
+                print("❌ Failed to delete chat \(chat.id) from backend: \(error)")
+                // Re-add to local state if backend deletion failed
+                await MainActor.run {
+                    if !self.chats.contains(where: { $0.id == chat.id }) {
+                        self.chats.append(chat)
+                        self.chats.sort { $0.lastMessageDate > $1.lastMessageDate }
                     }
                 }
             }
-
-            await channel.subscribe()
         }
     }
     

@@ -201,3 +201,11 @@ enum AuthenticationError: Error, LocalizedError {
         }
     }
 }
+
+extension AuthenticationService {
+    static var mock: AuthenticationService {
+        let service = AuthenticationService()
+        service.currentUser = .mock
+        return service
+    }
+}

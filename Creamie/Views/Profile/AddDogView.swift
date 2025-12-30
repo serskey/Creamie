@@ -96,11 +96,41 @@ extension AddDogView {
         }
     }
     
+    // MARK: - Fixed Interests Section
     private var interestsSection: some View {
         Section(header: Text("Interests")) {
-            interestInputRow
-            interestsDisplay
-            interestsHelpText
+            // Input row for adding interests
+            HStack {
+                TextField("Add an interest", text: $interestText)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onSubmit {
+                        addInterest()
+                    }
+                
+                Button(action: {
+                    addInterest()
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.purple)
+                        .accessibilityLabel("Add Interest")
+                }
+                .disabled(interestText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            
+            if !interests.isEmpty {
+                SimpleFlowLayout(items: interests) { interest in
+                    InterestChip(
+                        interest: interest,
+                        onDelete: { removeInterest(interest) }
+                    )
+                }
+                .padding(.vertical, 4)
+            } else {
+                Text("Interests are optional")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
         }
     }
     
@@ -258,51 +288,12 @@ extension AddDogView {
         if !hasMinimumPhotos {
             HStack {
                 Image(systemName: "info.circle")
-                    .foregroundColor(.orange)
+                    .foregroundColor(Color.purple)
                 Text("Please add at least \(minPhotos) photo to continue")
                     .font(.caption)
-                    .foregroundColor(.orange)
+                    .foregroundColor(.pink)
             }
             .padding(.top, 8)
-        }
-    }
-}
-
-// MARK: - Interest Components
-extension AddDogView {
-    private var interestInputRow: some View {
-        HStack {
-            TextField("Add an interest", text: $interestText)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-            
-            Button("Add") {
-                addInterest()
-            }
-            .disabled(interestText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-    }
-    
-    @ViewBuilder
-    private var interestsDisplay: some View {
-        if !interests.isEmpty {
-            FlowLayout(spacing: 8) {
-                ForEach(interests, id: \.self) { interest in
-                    InterestChip(
-                        interest: interest,
-                        onDelete: { removeInterest(interest) }
-                    )
-                }
-            }
-            .padding(.vertical, 4)
-        }
-    }
-    
-    @ViewBuilder
-    private var interestsHelpText: some View {
-        if interests.isEmpty {
-            Text("Interests are optional")
-                .foregroundColor(.secondary)
-                .font(.caption)
         }
     }
 }
@@ -408,12 +399,17 @@ extension AddDogView {
         let trimmedInterest = interestText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedInterest.isEmpty && !interests.contains(trimmedInterest) else { return }
         
-        interests.append(trimmedInterest)
+        withAnimation(.easeInOut(duration: 0.2)) {
+            interests.append(trimmedInterest)
+        }
         interestText = ""
     }
     
     private func removeInterest(_ interest: String) {
-        interests.removeAll { $0 == interest }
+        print("Remove interest \(interest)")
+        if let index = interests.firstIndex(of: interest) {
+            interests.remove(at: index)
+        }
     }
     
     private func saveDog() {
@@ -444,7 +440,7 @@ extension AddDogView {
         dismiss()
     }
     
-    // MARK: - Updated methods for AddDogView
+    // MARK: - Healthcare saving methods
     private func saveHealthcareData() async {
         var vaccination: VaccinationRecord? = nil
         var grooming: GroomingAppointment? = nil
@@ -508,70 +504,74 @@ extension AddDogView {
             vetAppointment: vetAppointment
         )
     }
+}
 
-    // MARK: - Updated methods for EditDogView
-    private func updateHealthData() async {
-        var vaccination: VaccinationRecord? = nil
-        var grooming: GroomingAppointment? = nil
-        var medication: Medication? = nil
-        var vetAppointment: VetAppointment? = nil
-        
-        // Create vaccination record if provided
-        if !vaccinationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            vaccination = VaccinationRecord(
-                vaccineName: vaccinationName,
-                vaccinationDate: Date(),
-                expirationDate: Date().addingTimeInterval(365 * 24 * 60 * 60), // 1 year default
-                veterinarianName: veterinarianName.isEmpty ? nil : veterinarianName,
-                clinicName: nil,
-                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes
-            )
+// MARK: - Simple Flow Layout
+struct SimpleFlowLayout<Data: RandomAccessCollection, Content: View>: View where Data.Index == Int {
+    let items: Data
+    let content: (Data.Element) -> Content
+    
+    @State private var totalHeight = CGFloat.zero
+    
+    var body: some View {
+        VStack {
+            GeometryReader { geometry in
+                self.generateContent(in: geometry)
+            }
         }
-        
-        // Create grooming record if provided
-        if !groomingService.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            grooming = GroomingAppointment(
-                appointmentDate: Date(),
-                groomingService: groomingService,
-                location: groomingLocation.isEmpty ? nil : groomingLocation,
-                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes,
-                isCompleted: true
-            )
+        .frame(height: totalHeight)
+    }
+    
+    private func generateContent(in geometry: GeometryProxy) -> some View {
+        var width = CGFloat.zero
+        var height = CGFloat.zero
+
+        let enumeratedItems = Array(items.enumerated())
+
+        return ZStack(alignment: .topLeading) {
+            ForEach(enumeratedItems, id: \.offset) { index, item in
+                content(item)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 4)
+                    .alignmentGuide(.leading, computeValue: { d in
+                        if (abs(width - d.width) > geometry.size.width) {
+                            width = 0
+                            height -= d.height
+                        }
+                        let result = width
+                        if index == enumeratedItems.count - 1 {
+                            width = 0
+                        } else {
+                            width -= d.width
+                        }
+                        return result
+                    })
+                    .alignmentGuide(.top, computeValue: { d in
+                        let result = height
+                        if index == enumeratedItems.count - 1 {
+                            height = 0
+                        }
+                        return result
+                    })
+            }
         }
-        
-        // Create medication record if provided
-        if !medicationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            medication = Medication(
-                medicationName: medicationName,
-                dosage: medicationDosage.isEmpty ? "As prescribed" : medicationDosage,
-                frequency: medicationFrequency.isEmpty ? "As needed" : medicationFrequency,
-                startDate: Date(),
-                endDate: nil, // Open-ended unless specified
-                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes
-            )
-        }
-        
-        // Create vet appointment record if provided
-        if !vetVisitPurpose.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            vetAppointment = VetAppointment(
-                purpose: vetVisitPurpose,
-                appointmentDate: Date(),
-                veterinarianName: veterinarianName.isEmpty ? nil : veterinarianName,
-                clinicName: vetClinicName.isEmpty ? nil : vetClinicName,
-                notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes,
-                isCompleted: true
-            )
-        }
-        
-        // Save all health data in one API call
-        await dogHealthViewModel.addHealthDataFromForm(
-            weight: Double(weightKg),
-            weightNotes: generalHealthNotes.isEmpty ? nil : generalHealthNotes,
-            vaccination: vaccination,
-            grooming: grooming,
-            medication: medication,
-            vetAppointment: vetAppointment
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .preference(key: ViewHeightKey.self, value: geo.frame(in: .local).size.height)
+            }
         )
+        .onPreferenceChange(ViewHeightKey.self) { value in
+            self.totalHeight = value
+        }
+    }
+
+}
+
+struct ViewHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
@@ -586,7 +586,7 @@ struct PhotoUploadBlock: View {
         ZStack(alignment: .topTrailing) {
             if let image = image {
                 selectedImageView(image: image)
-                deleteButton
+                deleteButton()
             } else {
                 placeholderView
             }
@@ -607,13 +607,14 @@ struct PhotoUploadBlock: View {
             .onTapGesture(perform: onSelect)
     }
     
-    private var deleteButton: some View {
+    private func deleteButton() -> some View {
         Button(action: onDelete) {
             Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 22))
-                .foregroundColor(.red)
+                .font(.system(size: 30))
+                .foregroundColor(Color.pink)
                 .background(Circle().fill(Color.white))
         }
+        .contentShape(Circle())
         .offset(x: 6, y: -6)
     }
     
@@ -633,23 +634,33 @@ struct PhotoUploadBlock: View {
 struct InterestChip: View {
     let interest: String
     let onDelete: () -> Void
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Text(interest)
                 .font(.subheadline)
-            
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.white)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color.purple.opacity(0.1))
-        .foregroundColor(.purple)
+        .background(Color.pink.opacity(0.5))
+        .foregroundColor(.white)
         .clipShape(Capsule())
+    }
+}
+
+// Add this extension for UIImage if not already present
+extension UIImage {
+    func resized(toWidth width: CGFloat) -> UIImage? {
+        let canvasSize = CGSize(width: width, height: CGFloat(ceil(width/size.width * size.height)))
+        UIGraphicsBeginImageContextWithOptions(canvasSize, false, scale)
+        defer { UIGraphicsEndImageContext() }
+        draw(in: CGRect(origin: .zero, size: canvasSize))
+        return UIGraphicsGetImageFromCurrentImageContext()
     }
 }
 
@@ -658,4 +669,6 @@ struct InterestChip: View {
         dogProfileViewModel: DogProfileViewModel(),
         dogHealthViewModel: DogHealthViewModel()
     )
+    .environmentObject(LocationManager())
+    .environmentObject(AuthenticationService.mock)
 }
