@@ -9,21 +9,21 @@ struct EditDogView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var locationManager: LocationManager
     @EnvironmentObject var authService: AuthenticationService
-    
+
     // MARK: - Dog Data
     let dogToEdit: Dog
-    
+
     // MARK: - Basic Information State
     @State private var name: String
     @State private var selectedBreed: DogBreed
     @State private var age: Int
     @State private var aboutMe: String
     @State private var ownerName: String
-    
+
     // MARK: - Interests State
     @State private var interestText: String = ""
     @State private var interests: [String] = []
-    
+
     // MARK: - Healthcare State
     @State private var weightKg: String = ""
     @State private var vaccinationName: String = ""
@@ -36,33 +36,48 @@ struct EditDogView: View {
     @State private var vetVisitPurpose: String = ""
     @State private var vetClinicName: String = ""
     @State private var generalHealthNotes: String = ""
+
     // MARK: - Photo Management State
     @State private var selectedItems: [PhotosPickerItem?] = Array(repeating: nil, count: 6)
     @State private var selectedImages: [UIImage?] = Array(repeating: nil, count: 6)
-    @State private var existingPhotos: [String] = []
+
+    // ✅ FIX: Use fixed slots so indices never shift
+    @State private var existingPhotoSlots: [String?] = Array(repeating: nil, count: 6)
+
     @State private var currentEditingIndex: Int? = nil
     @State private var photosToDelete: [String] = []
+
+    // Track if user is replacing an existing photo in the slot
+    @State private var replacingExistingPhotoInSlot: String? = nil
     
+    // Prevent rapid-fire deletions
+    @State private var isDeletingPhoto: Bool = false
+
     // MARK: - Constants
     private let maxPhotos = 6
     private let minPhotos = 1
-    
+
     // MARK: - Initializer
     init(dogProfileViewModel: DogProfileViewModel, dogHealthViewModel: DogHealthViewModel, dogToEdit: Dog) {
         self.dogProfileViewModel = dogProfileViewModel
         self.dogHealthViewModel = dogHealthViewModel
         self.dogToEdit = dogToEdit
-        
-        // Initialize state with existing dog data
+
         self._name = State(initialValue: dogToEdit.name)
         self._selectedBreed = State(initialValue: dogToEdit.breed)
         self._age = State(initialValue: dogToEdit.age)
         self._interests = State(initialValue: dogToEdit.interests ?? [])
         self._aboutMe = State(initialValue: dogToEdit.aboutMe ?? "")
         self._ownerName = State(initialValue: dogToEdit.ownerName ?? "")
-        self._existingPhotos = State(initialValue: dogToEdit.photos)
+
+        // ✅ Put existing photos into fixed slots [0...5]
+        var slots = Array<String?>(repeating: nil, count: 6)
+        for (i, p) in dogToEdit.photos.prefix(6).enumerated() {
+            slots[i] = p
+        }
+        self._existingPhotoSlots = State(initialValue: slots)
     }
-    
+
     // MARK: - Body
     var body: some View {
         NavigationView {
@@ -76,9 +91,7 @@ struct EditDogView: View {
             }
             .navigationTitle("Edit \(dogToEdit.name)")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                toolbarContent
-            }
+            .toolbar { toolbarContent }
             .photosPicker(
                 isPresented: photosPickerBinding,
                 selection: selectedItemBinding,
@@ -103,12 +116,12 @@ extension EditDogView {
             .padding(.vertical, 8)
         }
     }
-    
+
     private var basicInformationSection: some View {
         Section(header: Text("Basic Information")) {
             TextField("Dog's Name", text: $name)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
-            
+
             Picker("Breed", selection: $selectedBreed) {
                 ForEach(DogBreed.sortedBreeds, id: \.self) { breed in
                     Text(breed.rawValue)
@@ -117,11 +130,11 @@ extension EditDogView {
                 }
             }
             .pickerStyle(.automatic)
-            
+
             Stepper("Age: \(age) year\(age == 1 ? "" : "s")", value: $age, in: 1...50)
         }
     }
-    
+
     private var interestsSection: some View {
         Section(header: Text("Interests")) {
             interestInputRow
@@ -129,19 +142,19 @@ extension EditDogView {
             interestsHelpText
         }
     }
-    
+
     private var aboutMeSection: some View {
         Section(header: Text("About Me")) {
             TextField("Tell us about your dog (optional)", text: $aboutMe, axis: .vertical)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .lineLimit(3...10)
-            
+
             Text("Share what makes your dog special")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
     }
-    
+
     private var locationSection: some View {
         Section(header: Text("Location")) {
             HStack {
@@ -152,13 +165,13 @@ extension EditDogView {
                 Text("📍")
             }
             .padding(.vertical, 4)
-            
+
             Text(locationDescriptionText)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
     }
-    
+
     private var healthcareSection: some View {
         Section(header: Text("Healthcare (Optional)")) {
             VStack(alignment: .leading, spacing: 16) {
@@ -167,85 +180,85 @@ extension EditDogView {
                     Text("Weight")
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     TextField("Weight (kg)", text: $weightKg)
                         .keyboardType(.decimalPad)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
-                
+
                 Divider()
-                
+
                 // Vaccination Section
                 Group {
                     Text("Vaccination")
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     TextField("Vaccine Name", text: $vaccinationName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
+
                     TextField("Veterinarian Name", text: $veterinarianName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
-                
+
                 Divider()
-                
+
                 // Grooming Section
                 Group {
                     Text("Grooming")
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     TextField("Grooming Service", text: $groomingService)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
+
                     TextField("Location", text: $groomingLocation)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
-                
+
                 Divider()
-                
+
                 // Medication Section
                 Group {
                     Text("Medication")
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     TextField("Medication Name", text: $medicationName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
+
                     HStack(spacing: 8) {
                         TextField("Dosage", text: $medicationDosage)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                        
+
                         TextField("Frequency", text: $medicationFrequency)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                     }
                 }
-                
+
                 Divider()
-                
+
                 // Vet Visit Section
                 Group {
                     Text("Vet Visit")
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     TextField("Visit Purpose", text: $vetVisitPurpose)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
+
                     TextField("Clinic Name", text: $vetClinicName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
-                
+
                 Divider()
-                
+
                 // General Notes Section
                 Group {
                     Text("General Health Notes")
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     TextField("Additional health notes", text: $generalHealthNotes, axis: .vertical)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .lineLimit(3...6)
@@ -268,19 +281,30 @@ extension EditDogView {
             GridItem(.flexible()),
             GridItem(.flexible())
         ], spacing: 12) {
+
             ForEach(0..<maxPhotos, id: \.self) { index in
+                let capturedIndex = index  // ✅ Explicit capture to prevent closure issues
                 PhotoSlotBlock(
-                    index: index,
-                    existingPhoto: index < existingPhotos.count ? existingPhotos[index] : nil,
-                    newImage: selectedImages[index],
-                    onSelectPhoto: { currentEditingIndex = index },
-                    onDeleteExisting: { deleteExistingPhoto(at: index) },
-                    onDeleteNew: { deleteNewPhoto(at: index) }
+                    index: capturedIndex,
+                    existingPhoto: existingPhotoSlots[capturedIndex],
+                    newImage: selectedImages[capturedIndex],
+                    onSelectPhoto: {
+                        // If you tap a slot that currently contains an existing photo,
+                        // we treat it as a replacement selection.
+                        currentEditingIndex = capturedIndex
+                        replacingExistingPhotoInSlot = existingPhotoSlots[capturedIndex]
+                    },
+                    onDeleteExisting: {
+                        deleteExistingPhoto(at: capturedIndex)
+                    },
+                    onDeleteNew: {
+                        deleteNewPhoto(at: capturedIndex)
+                    }
                 )
             }
         }
     }
-    
+
     @ViewBuilder
     private var photoRequirementMessage: some View {
         if !hasMinimumPhotos {
@@ -302,10 +326,8 @@ extension EditDogView {
         HStack {
             TextField("Add an interest", text: $interestText)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
-            
-            Button(action: {
-                addInterest()
-            }) {
+
+            Button(action: { addInterest() }) {
                 Image(systemName: "plus.circle.fill")
                     .font(.title2)
                     .foregroundColor(.purple)
@@ -314,11 +336,11 @@ extension EditDogView {
             .disabled(interestText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
     }
-    
+
     @ViewBuilder
     private var interestsDisplay: some View {
         if !interests.isEmpty {
-            SimpleFlowLayout(items: interests) { interest in
+            SimpleFlowLayoutEdit(items: interests) { interest in
                 InterestChip(
                     interest: interest,
                     onDelete: { removeInterest(interest) }
@@ -327,7 +349,7 @@ extension EditDogView {
             .padding(.vertical, 4)
         }
     }
-    
+
     @ViewBuilder
     private var interestsHelpText: some View {
         if interests.isEmpty {
@@ -347,7 +369,7 @@ extension EditDogView {
                 Image(systemName: "xmark")
             }
         }
-        
+
         ToolbarItem(placement: .topBarTrailing) {
             Button(action: { updateDog() }) {
                 Image(systemName: "checkmark")
@@ -363,7 +385,7 @@ extension EditDogView {
     private var locationDisplayText: String {
         locationManager.userLocation != nil ? "Current Location" : "Using Existing Location"
     }
-    
+
     private var locationDescriptionText: String {
         if locationManager.userLocation != nil {
             return "Using your current location"
@@ -371,13 +393,17 @@ extension EditDogView {
             return "Using dog's existing location - enable location access to update"
         }
     }
-    
+
+    private var existingPhotosCompact: [String] {
+        existingPhotoSlots.compactMap { $0 }
+    }
+
     private var hasMinimumPhotos: Bool {
         let newImagesCount = selectedImages.compactMap { $0 }.count
-        let totalPhotos = existingPhotos.count + newImagesCount
+        let totalPhotos = existingPhotosCompact.count + newImagesCount
         return totalPhotos >= minPhotos
     }
-    
+
     private var isFormValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         age > 0 &&
@@ -390,10 +416,10 @@ extension EditDogView {
     private var photosPickerBinding: Binding<Bool> {
         Binding(
             get: { currentEditingIndex != nil },
-            set: { if !$0 { currentEditingIndex = nil } }
+            set: { if !$0 { currentEditingIndex = nil; replacingExistingPhotoInSlot = nil } }
         )
     }
-    
+
     private var selectedItemBinding: Binding<PhotosPickerItem?> {
         Binding(
             get: {
@@ -403,11 +429,9 @@ extension EditDogView {
             set: { newValue in
                 guard let index = currentEditingIndex else { return }
                 selectedItems[index] = newValue
-                
+
                 if let item = newValue {
-                    Task {
-                        await processSelectedImage(item: item, at: index)
-                    }
+                    Task { await processSelectedImage(item: item, at: index) }
                 }
             }
         )
@@ -417,119 +441,183 @@ extension EditDogView {
 // MARK: - Helper Methods
 extension EditDogView {
     private func deleteExistingPhoto(at index: Int) {
-        guard index < existingPhotos.count else { return }
-        existingPhotos.remove(at: index)
+        // Prevent rapid-fire deletions
+        guard !isDeletingPhoto else {
+            print("⚠️ Already deleting a photo, ignoring duplicate tap")
+            return
+        }
+        
+        // ✅ Bounds checking
+        guard index >= 0, index < maxPhotos else {
+            print("⚠️ Invalid index \(index) for deleteExistingPhoto - out of bounds")
+            return
+        }
+        
+        // ✅ Validate slot contains a photo
+        guard let photo = existingPhotoSlots[index] else {
+            print("⚠️ No existing photo in slot \(index) to delete")
+            return
+        }
+
+        isDeletingPhoto = true
+        
+        print("🗑️ DELETE BUTTON TAPPED - Deleting EXISTING photo from slot \(index): \(photo)")
+        print("📸 Existing photos BEFORE deletion: \(existingPhotoSlots)")
+        
+        // Clear the slot
+        existingPhotoSlots[index] = nil
+        photosToDelete.append(photo)
+        
+        print("📸 Existing photos AFTER deletion: \(existingPhotoSlots)")
+        print("🧾 Photos marked for deletion: \(photosToDelete)")
+        
+        // ✅ Critical: reset these so picker doesn't open
+        replacingExistingPhotoInSlot = nil
+        currentEditingIndex = nil
+        
+        // Reset deletion flag after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            isDeletingPhoto = false
+        }
     }
-    
+
     private func deleteNewPhoto(at index: Int) {
+        // Prevent rapid-fire deletions
+        guard !isDeletingPhoto else {
+            print("⚠️ Already deleting a photo, ignoring duplicate tap")
+            return
+        }
+        
+        // ✅ Bounds checking
+        guard index >= 0, index < maxPhotos else {
+            print("⚠️ Invalid index \(index) for deleteNewPhoto - out of bounds")
+            return
+        }
+        
+        // ✅ Validate slot contains a new image
+        guard selectedImages[index] != nil else {
+            print("⚠️ No new photo in slot \(index) to delete")
+            return
+        }
+        
+        isDeletingPhoto = true
+        
+        print("🗑️ Deleting NEW photo from slot \(index)")
+        print("🖼️ Selected images BEFORE deletion: \(selectedImages.enumerated().filter { $0.element != nil }.map { $0.offset })")
+        
         selectedItems[index] = nil
         selectedImages[index] = nil
+        
+        print("🖼️ Selected images AFTER deletion: \(selectedImages.enumerated().filter { $0.element != nil }.map { $0.offset })")
+        
+        // Reset deletion flag after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            isDeletingPhoto = false
+        }
     }
-    
+
     private func addInterest() {
         let trimmedInterest = interestText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedInterest.isEmpty && !interests.contains(trimmedInterest) else { return }
-        
+
         interests.append(trimmedInterest)
         interestText = ""
     }
-    
+
     private func removeInterest(_ interest: String) {
         interests.removeAll { $0 == interest }
     }
-    
+
+    // ✅ FIX: replacement is based on the SLOT the user tapped (no shifting)
     private func processSelectedImage(item: PhotosPickerItem, at index: Int) async {
         guard let data = try? await item.loadTransferable(type: Data.self),
               let uiImage = UIImage(data: data) else { return }
-        
+
         let resizedImage = uiImage.resized(toWidth: 1000)
-        selectedImages[index] = resizedImage
-        
-        // Mark existing photo for deletion if we're replacing it
-        if index < existingPhotos.count {
-            let photoToDelete = existingPhotos[index]
-            photosToDelete.append(photoToDelete)
+
+        await MainActor.run {
+            selectedImages[index] = resizedImage
+
+            // If this slot previously had an existing photo, mark it for deletion and clear the slot.
+            if let oldPhoto = replacingExistingPhotoInSlot {
+                print("♻️ Replacing existing photo in slot \(index): \(oldPhoto)")
+                photosToDelete.append(oldPhoto)
+                existingPhotoSlots[index] = nil
+                replacingExistingPhotoInSlot = nil
+            }
+
+            print("📸 Existing after replace:", existingPhotosCompact)
+            print("🧾 photosToDelete:", photosToDelete)
         }
     }
-    
+
     private func updateDog() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let newPhotos = selectedImages.compactMap { $0 }
-        let aboutMeString = aboutMe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?
-            nil : aboutMe.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Update dog profile
+        let aboutMeString = aboutMe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? nil
+            : aboutMe.trimmingCharacters(in: .whitespacesAndNewlines)
+
         dogProfileViewModel.updateDog(
             dogId: dogToEdit.id,
             name: trimmedName,
             breed: selectedBreed,
             age: age,
             interests: interests,
-            existingPhotos: existingPhotos,
+            existingPhotos: existingPhotosCompact,      // ✅ compacted slots
             newPhotos: newPhotos,
             aboutMe: aboutMeString,
             photosToDelete: photosToDelete
         )
-        
-        // Update health data
-        Task {
-            await updateHealthData()
-        }
-        
+
+        Task { await updateHealthData() }
         dismiss()
     }
-    
+
     private func loadExistingHealthData() {
-        // Load current weight from latest record
         if let latestWeight = dogHealthViewModel.weightHistory.last {
             weightKg = String(latestWeight.weightKg)
         }
-        
-        // Load latest vaccination info
+
         if let latestVaccination = dogHealthViewModel.vaccinations.last {
             vaccinationName = latestVaccination.vaccineName
             veterinarianName = latestVaccination.veterinarianName ?? ""
         }
-        
-        // Load latest grooming info
+
         if let latestGrooming = dogHealthViewModel.groomingAppointments.last {
             groomingService = latestGrooming.groomingService ?? ""
             groomingLocation = latestGrooming.location ?? ""
         }
-        
-        // Load current medication info
+
         if let currentMedication = dogHealthViewModel.currentMedications().first {
             medicationName = currentMedication.medicationName
             medicationDosage = currentMedication.dosage
             medicationFrequency = currentMedication.frequency
         }
-        
-        // Load latest vet appointment info
+
         if let latestVetVisit = dogHealthViewModel.vetAppointments.last {
             vetVisitPurpose = latestVetVisit.purpose
             vetClinicName = latestVetVisit.clinicName ?? ""
         }
     }
-    
+
     private func updateHealthData() async {
         var vaccination: VaccinationRecord? = nil
         var grooming: GroomingAppointment? = nil
         var medication: Medication? = nil
         var vetAppointment: VetAppointment? = nil
-        
-        // Create vaccination record if provided
+
         if !vaccinationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             vaccination = VaccinationRecord(
                 vaccineName: vaccinationName,
                 vaccinationDate: Date(),
-                expirationDate: Date().addingTimeInterval(365 * 24 * 60 * 60), // 1 year default
+                expirationDate: Date().addingTimeInterval(365 * 24 * 60 * 60),
                 veterinarianName: veterinarianName.isEmpty ? nil : veterinarianName,
                 clinicName: nil,
                 notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes
             )
         }
-        
-        // Create grooming record if provided
+
         if !groomingService.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             grooming = GroomingAppointment(
                 appointmentDate: Date(),
@@ -539,20 +627,18 @@ extension EditDogView {
                 isCompleted: true
             )
         }
-        
-        // Create medication record if provided
+
         if !medicationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             medication = Medication(
                 medicationName: medicationName,
                 dosage: medicationDosage.isEmpty ? "As prescribed" : medicationDosage,
                 frequency: medicationFrequency.isEmpty ? "As needed" : medicationFrequency,
                 startDate: Date(),
-                endDate: nil, // Open-ended unless specified
+                endDate: nil,
                 notes: generalHealthNotes.isEmpty ? nil : generalHealthNotes
             )
         }
-        
-        // Create vet appointment record if provided
+
         if !vetVisitPurpose.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             vetAppointment = VetAppointment(
                 purpose: vetVisitPurpose,
@@ -563,8 +649,7 @@ extension EditDogView {
                 isCompleted: true
             )
         }
-        
-        // Save all health data in one API call
+
         await dogHealthViewModel.addHealthDataFromForm(
             weight: Double(weightKg),
             weightNotes: generalHealthNotes.isEmpty ? nil : generalHealthNotes,
@@ -580,9 +665,9 @@ extension EditDogView {
 private struct SimpleFlowLayoutEdit<Data: RandomAccessCollection, Content: View>: View where Data.Element: Hashable {
     let items: Data
     let content: (Data.Element) -> Content
-    
+
     @State private var totalHeight = CGFloat.zero
-    
+
     var body: some View {
         VStack {
             GeometryReader { geometry in
@@ -591,11 +676,11 @@ private struct SimpleFlowLayoutEdit<Data: RandomAccessCollection, Content: View>
         }
         .frame(height: totalHeight)
     }
-    
+
     private func generateContent(in geometry: GeometryProxy) -> some View {
         var width = CGFloat.zero
         var height = CGFloat.zero
-        
+
         return ZStack(alignment: .topLeading) {
             ForEach(Array(items), id: \.self) { item in
                 content(item)
@@ -643,21 +728,36 @@ struct PhotoSlotBlock: View {
     let onSelectPhoto: () -> Void
     let onDeleteExisting: () -> Void
     let onDeleteNew: () -> Void
-    
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             if let newImage = newImage {
                 newImageView(image: newImage)
-                deleteButton(action: onDeleteNew, color: .pink)
+                deleteButton(
+                    action: {
+                        print("🗑️ User tapped delete NEW photo on slot \(index)")
+                        onDeleteNew()
+                    },
+                    color: .pink,
+                    label: "delete-new-\(index)"
+                )
             } else if let existingPhoto = existingPhoto {
                 existingPhotoView(photoName: existingPhoto)
-                deleteButton(action: onDeleteExisting, color: .pink)
+                deleteButton(
+                    action: {
+                        print("🗑️ User tapped delete EXISTING photo on slot \(index)")
+                        onDeleteExisting()
+                    },
+                    color: .pink,
+                    label: "delete-existing-\(index)"
+                )
             } else {
                 placeholderView
             }
         }
+        .id("photo-slot-\(index)")
     }
-    
+
     private func newImageView(image: UIImage) -> some View {
         Image(uiImage: image)
             .resizable()
@@ -670,7 +770,7 @@ struct PhotoSlotBlock: View {
             )
             .onTapGesture(perform: onSelectPhoto)
     }
-    
+
     private func existingPhotoView(photoName: String) -> some View {
         DogPhotoView(photoName: photoName)
             .frame(width: 100, height: 100)
@@ -681,7 +781,7 @@ struct PhotoSlotBlock: View {
             )
             .onTapGesture(perform: onSelectPhoto)
     }
-    
+
     private var placeholderView: some View {
         VStack {
             Image(systemName: "photo.badge.plus")
@@ -693,16 +793,18 @@ struct PhotoSlotBlock: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .onTapGesture(perform: onSelectPhoto)
     }
-    
-    private func deleteButton(action: @escaping () -> Void, color: Color) -> some View {
+
+    private func deleteButton(action: @escaping () -> Void, color: Color, label: String) -> some View {
         Button(action: action) {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 30))
                 .foregroundColor(color)
                 .background(Circle().fill(Color.white))
         }
+        .buttonStyle(PlainButtonStyle())
         .contentShape(Circle())
-        .offset(x: 6, y: -6)
+        .accessibilityIdentifier(label)
+        .id(label)
     }
 }
 

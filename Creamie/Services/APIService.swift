@@ -4,12 +4,16 @@ import Combine
 // MARK: - API Configuration
 struct APIConfig {
     /**
-     http://192.168.0.101:9000 is for physical iPhone testing
+     - Get your Mac's local IP
      ifconfig | grep "inet " | grep -v 127.0.0.1
+
+     inet 192.168.0.101 netmask 0xffffff00 broadcast 192.168.0.255  // 192.168.0.101 is for belowing baseURL
+     inet 169.254.170.133 netmask 0xffff0000 broadcast 169.254.255.255
+
      change back to `http://127.0.0.1:9000` for local testing
      */
 //    static let baseURL = "http://127.0.0.1:9000"
-    static let baseURL = "http://192.168.0.101:9000"
+    static let baseURL = "http://127.0.0.1:9000"
     static let timeout: TimeInterval = 30.0
 }
 
