@@ -39,3 +39,10 @@ If you need help, contact us: serskeyxusiqi@gmail.com. We usually respond within
 Common Issues:
 Trouble logging in → restart app
 Location not updating → enable location permissions
+
+-------------------------------------------------------------------------------------------------------
+Privacy Policy
+
+Information We Collect: We collect information you provide when creating your profile, including your name, email, and dog information.              
+Location Data: We use your location to show nearby dogs and enable meetups. Location data is only shared with your explicit consent.
+Data Security: We implement security measures to protect your personal information and ensure data privacy.
