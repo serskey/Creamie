@@ -811,7 +811,7 @@ struct PhotoSlotBlock: View {
 // MARK: - Preview
 #Preview {
     EditDogView(
-        dogProfileViewModel: DogProfileViewModel(),
+        dogProfileViewModel: DogProfileViewModel(locationTracker: DogLocationTracker()),
         dogHealthViewModel: DogHealthViewModel(),
         dogToEdit: Dog(
             id: UUID(),

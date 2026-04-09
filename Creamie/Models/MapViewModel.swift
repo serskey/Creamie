@@ -1,5 +1,6 @@
 import MapKit
 import CoreLocation
+import Combine
 
 @MainActor
 class MapViewModel: ObservableObject {
@@ -7,6 +8,7 @@ class MapViewModel: ObservableObject {
     @Published var searchResults: [Dog] = []
     @Published var isSearching = false
     @Published var searchError: String?
+    @Published var isRealTimeConnected = false
     
     private let locationService = DogLocationService.shared
     private let dogProfileService = DogProfileService.shared
@@ -14,6 +16,7 @@ class MapViewModel: ObservableObject {
     private var currentVisibleRegion: MKCoordinateRegion?
     private var fetchTimer: Timer?
     private var searchTimer: Timer?
+    private var cancellables = Set<AnyCancellable>()
     
     private(set) var isInitialLoad = true
     
@@ -25,6 +28,12 @@ class MapViewModel: ObservableObject {
         static let debounceDelay: TimeInterval = 0.5
         static let searchDebounceDelay: TimeInterval = 0.3
         static let defaultSearchRadius: Double = 10.0 // km
+    }
+    
+    // MARK: - Initialization
+    
+    init() {
+        subscribeToRealTimeUpdates()
     }
     
     func setInitialRegion(center: CLLocationCoordinate2D) {
@@ -150,9 +159,66 @@ class MapViewModel: ObservableObject {
         return searchResults.isEmpty ? nearbyDogs : searchResults
     }
     
+    // MARK: - Real-time Location Updates
+    
+    /// Subscribe to real-time location updates from DogLocationService WebSocket
+    private func subscribeToRealTimeUpdates() {
+        // Observe nearbyDogs changes from DogLocationService (updated via WebSocket)
+        locationService.$nearbyDogs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] updatedDogs in
+                self?.handleRealTimeLocationUpdates(updatedDogs)
+            }
+            .store(in: &cancellables)
+        
+        // Track WebSocket connection status
+        locationService.$isConnected
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$isRealTimeConnected)
+    }
+    
+    /// Start real-time WebSocket connection for the user's current location
+    func startRealTimeUpdates(userLocation: CLLocationCoordinate2D, radius: Double = Constants.defaultSearchRadius) {
+        locationService.startRealTimeUpdates(userLocation: userLocation, radius: radius)
+    }
+    
+    /// Stop real-time WebSocket connection
+    func stopRealTimeUpdates() {
+        locationService.stopRealTimeUpdates()
+    }
+    
+    /// Handle incoming real-time location updates from DogLocationService
+    private func handleRealTimeLocationUpdates(_ updatedDogs: [Dog]) {
+        // Merge real-time updates into the local nearbyDogs array
+        for updatedDog in updatedDogs {
+            if let index = nearbyDogs.firstIndex(where: { $0.id == updatedDog.id }) {
+                if updatedDog.isOnline {
+                    // Update existing dog's position and status
+                    nearbyDogs[index] = updatedDog
+                } else {
+                    // Dog went offline — remove from map (Requirement 3.2)
+                    nearbyDogs.remove(at: index)
+                }
+            } else if updatedDog.isOnline {
+                // Dog came online — add marker at current location (Requirement 3.3)
+                nearbyDogs.append(updatedDog)
+            }
+        }
+        
+        // Remove dogs that disappeared from the service's list entirely (went offline)
+        let updatedDogIds = Set(updatedDogs.map { $0.id })
+        if !updatedDogIds.isEmpty {
+            nearbyDogs.removeAll { dog in
+                !updatedDogIds.contains(dog.id) && !dog.isOnline
+            }
+        }
+    }
+    
     deinit {
         fetchTimer?.invalidate()
         searchTimer?.invalidate()
+        cancellables.removeAll()
+        locationService.stopRealTimeUpdates()
     }
 }
 

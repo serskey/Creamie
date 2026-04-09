@@ -129,10 +129,74 @@ extension DogCard {
             Text("\(dog.age) years old")
                 .font(.title2.bold())
                 .foregroundColor(.primary)
+            
+            // Location tracking status indicator
+            if dogProfileViewModel.isLocationTrackingEnabled(for: dog.id) {
+                locationTrackingStatusIndicator(dog: dog)
+            }
         }
         .padding(.vertical, 20)
         .padding(.horizontal, 24)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+    
+    @ViewBuilder
+    private func locationTrackingStatusIndicator(dog: Dog) -> some View {
+        if let status = dogProfileViewModel.getLocationTrackingStatus(for: dog.id) {
+            VStack(spacing: 4) {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                HStack(spacing: 8) {
+                    Image(systemName: "location.fill")
+                        .font(.caption)
+                    
+                    switch status {
+                    case .active:
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 6, height: 6)
+                            Text("Location tracking active")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
+                        
+                        if let lastUpdate = dog.lastLocationUpdate {
+                            Text("• Updated \(timeAgoString(from: lastUpdate))")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                    case .paused:
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.orange)
+                                .frame(width: 6, height: 6)
+                            Text("Location tracking paused")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                        
+                    case .stopped:
+                        Text("Location tracking stopped")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                    case .error(let message):
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                            Text("Tracking error: \(message)")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .lineLimit(2)
+                        }
+                    }
+                }
+            }
+        }
     }
     
     private func onlineStatusToggle(dog: Dog) -> some View {
@@ -213,6 +277,23 @@ extension DogCard {
         isOnline.toggle()
         Task {
             await dogProfileViewModel.updateDogOnlineStatus(isOnline: isOnline, dogId: dog.id)
+        }
+    }
+    
+    private func timeAgoString(from date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
+        
+        if seconds < 60 {
+            return "just now"
+        } else if seconds < 3600 {
+            let minutes = seconds / 60
+            return "\(minutes)m ago"
+        } else if seconds < 86400 {
+            let hours = seconds / 3600
+            return "\(hours)h ago"
+        } else {
+            let days = seconds / 86400
+            return "\(days)d ago"
         }
     }
 }

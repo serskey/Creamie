@@ -666,7 +666,7 @@ extension UIImage {
 
 #Preview {
     AddDogView(
-        dogProfileViewModel: DogProfileViewModel(),
+        dogProfileViewModel: DogProfileViewModel(locationTracker: DogLocationTracker()),
         dogHealthViewModel: DogHealthViewModel()
     )
     .environmentObject(LocationManager())

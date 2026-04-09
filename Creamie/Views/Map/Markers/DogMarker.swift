@@ -3,19 +3,29 @@ import SwiftUI
 struct DogMarker: View {
     let dog: Dog
     
+    /// Marker fill color based on online/offline status
+    private var markerColor: Color {
+        dog.isOnline ? .purple : .gray
+    }
+    
+    /// Opacity applied to the entire marker for offline dogs
+    private var markerOpacity: Double {
+        dog.isOnline ? 1.0 : 0.45
+    }
+    
     var body: some View {
         ZStack {
             // Water drop shape background
             WaterDropShape()
-                .fill(Color.purple)
+                .fill(markerColor)
                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                 .frame(width: 40, height: 50)
-                .shadow(radius: 4, x: 0, y: 2)
+                .shadow(radius: dog.isOnline ? 4 : 1, x: 0, y: 2)
             
             // Dog breed image or fallback icon
             ZStack {
                 Circle()
-                    .fill(Color.purple)
+                    .fill(markerColor)
                     .frame(width: 40, height: 40)
                 
                 Group {
@@ -35,6 +45,7 @@ struct DogMarker: View {
             .offset(x: 1.5, y: -6.3)
             
         }
+        .opacity(markerOpacity)
     }
 
     

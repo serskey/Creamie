@@ -10,7 +10,7 @@ struct SettingsView: View {
     @State private var showingPrivacyPolicy = false
     @State private var showingTerms = false
     @State private var showingLogoutAlert = false
-    @StateObject private var dogProfileViewModel = DogProfileViewModel()
+    @StateObject private var dogProfileViewModel = DogProfileViewModel(locationTracker: DogLocationTracker())
     @AppStorage("isOnline") private var isOnline = true
     @Environment(\.openURL) private var openURL
     

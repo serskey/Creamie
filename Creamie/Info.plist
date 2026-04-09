@@ -8,6 +8,16 @@
 	<array>
 		<string>app-settings</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Creamie needs your location to show nearby dogs on the map.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Creamie needs your location in the background to continuously update your dog's location so other users can see where your dog is in real-time.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Creamie needs your location in the background to continuously update your dog's location so other users can see where your dog is in real-time.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
     <key>SUPABASE_URL</key>
     <string>https://bibnhxcfmdpwqcfftgtj.supabase.co</string>
     <key>SUPABASE_ANON_KEY</key>

@@ -18,6 +18,8 @@ struct Dog: Identifiable, Hashable, Codable {
     var isOnline: Bool
     var updatedAt: Date?
     var createdAt: Date?
+    var isLocationTrackingEnabled: Bool?
+    var lastLocationUpdate: Date?
     
     // Convenience property for backward compatibility
     var photo: String {
@@ -47,6 +49,8 @@ struct Dog: Identifiable, Hashable, Codable {
             isOnline: Bool,
             updatedAt: Date,
             createdAt: Date? = nil,
+            isLocationTrackingEnabled: Bool? = nil,
+            lastLocationUpdate: Date? = nil
         ) {
             self.id = id
             self.name = name
@@ -62,6 +66,8 @@ struct Dog: Identifiable, Hashable, Codable {
             self.isOnline = isOnline
             self.updatedAt = updatedAt
             self.createdAt = createdAt
+            self.isLocationTrackingEnabled = isLocationTrackingEnabled
+            self.lastLocationUpdate = lastLocationUpdate
         }
 }
 
@@ -79,11 +85,112 @@ class DogProfileViewModel: ObservableObject {
     @Published var deleteDogSuccess: String?
     @Published var showingEditDog = false
     
+    // Location tracking
+    @Published var locationTracker: DogLocationTracker
+    
     private let dogProfileService = DogProfileService.shared
     
     private var photoCounter = 0
     
     private let minPhotos = 1
+    
+    // MARK: - Initialization
+    
+    init(locationTracker: DogLocationTracker) {
+        self.locationTracker = locationTracker
+    }
+    
+    // MARK: - Location Tracking Methods
+    
+    /// Toggle location tracking for a specific dog.
+    /// Returns false if permission is needed (caller should show appropriate UI).
+    @discardableResult
+    func toggleLocationTracking(for dogId: UUID, enabled: Bool) async -> Bool {
+        // Keep dog names in sync for notification messages
+        if let dog = dogs.first(where: { $0.id == dogId }) {
+            locationTracker.dogNames[dogId] = dog.name
+        }
+        
+        if enabled {
+            // Check permissions before starting tracking
+            let result = locationTracker.checkPermissionForTracking()
+            
+            switch result {
+            case .authorized:
+                // Already have "Always" — start tracking immediately
+                locationTracker.startTracking(for: dogId)
+                await updateDogOnlineStatus(isOnline: true, dogId: dogId)
+                if let index = dogs.firstIndex(where: { $0.id == dogId }) {
+                    dogs[index].isLocationTrackingEnabled = true
+                    dogs[index].lastLocationUpdate = Date()
+                }
+                return true
+                
+            case .needsAlwaysExplanation:
+                // Need to show explanation alert, then request permission
+                locationTracker.needsAlwaysPermissionExplanation = true
+                locationTracker.pendingTrackingDogId = dogId
+                return false
+                
+            case .denied(let message):
+                // Permission denied — show denial message
+                locationTracker.permissionDenied = true
+                locationTracker.permissionDeniedMessage = message
+                return false
+            }
+        } else {
+            locationTracker.stopTracking(for: dogId)
+            await updateDogOnlineStatus(isOnline: false, dogId: dogId)
+            if let index = dogs.firstIndex(where: { $0.id == dogId }) {
+                dogs[index].isLocationTrackingEnabled = false
+            }
+            return true
+        }
+    }
+    
+    /// Called after user acknowledges the "Always" permission explanation alert.
+    /// Requests the actual system permission.
+    func confirmAlwaysPermissionRequest() {
+        guard let dogId = locationTracker.pendingTrackingDogId else { return }
+        locationTracker.requestAlwaysAuthorization(for: dogId)
+    }
+    
+    /// Get tracking status for a specific dog
+    func getLocationTrackingStatus(for dogId: UUID) -> TrackingStatus? {
+        return locationTracker.getTrackingStatus(for: dogId)
+    }
+    
+    /// Check if location tracking is enabled for a specific dog
+    func isLocationTrackingEnabled(for dogId: UUID) -> Bool {
+        return locationTracker.isTracking(dogId: dogId)
+    }
+    
+    /// Load tracking preferences on app start and resume tracking
+    func loadTrackingPreferences() {
+        let preferencesStore = TrackingPreferencesStore()
+        let allPreferences = preferencesStore.loadAllPreferences()
+        
+        // Sync dog names for notification messages
+        for dog in dogs {
+            locationTracker.dogNames[dog.id] = dog.name
+        }
+        
+        for preference in allPreferences {
+            if preference.isEnabled {
+                // Check if this dog exists in our dogs array
+                if dogs.contains(where: { $0.id == preference.dogId }) {
+                    print("🔄 Resuming tracking for dog: \(preference.dogId)")
+                    locationTracker.startTracking(for: preference.dogId)
+                    
+                    // Update local dog model
+                    if let index = dogs.firstIndex(where: { $0.id == preference.dogId }) {
+                        dogs[index].isLocationTrackingEnabled = true
+                        dogs[index].lastLocationUpdate = preference.lastUpdateTime
+                    }
+                }
+            }
+        }
+    }
     
     func fetchUserDogs(userId: UUID) async {
         let getUserDogsRequest = GetUserDogsRequest(userId: userId)

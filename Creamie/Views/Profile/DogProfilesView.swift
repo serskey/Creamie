@@ -1,8 +1,9 @@
 import SwiftUI
+import UIKit
 
 struct DogProfilesView: View {
     // MARK: - View Models & Services
-    @StateObject private var dogProfileViewModel = DogProfileViewModel()
+    @StateObject private var dogProfileViewModel = DogProfileViewModel(locationTracker: DogLocationTracker())
     @StateObject private var dogHealthViewModel = DogHealthViewModel()
     @EnvironmentObject var authService: AuthenticationService
     private let locationService = DogLocationService.shared
@@ -23,6 +24,7 @@ struct DogProfilesView: View {
         }
         .task {
             await dogProfileViewModel.fetchUserDogs(userId: authService.currentUser!.id)
+            dogProfileViewModel.loadTrackingPreferences()
         }
         .onChange(of: dogProfileViewModel.dogs) { _, newDogs in
             resetIndexIfNeeded(newDogs: newDogs)
@@ -57,6 +59,26 @@ struct DogProfilesView: View {
             retryDeletionAlertButtons
         } message: {
             Text(alertDeletionErrorMessage)
+        }
+        .alert("Background Location Needed", isPresented: $dogProfileViewModel.locationTracker.needsAlwaysPermissionExplanation) {
+            Button("Allow") {
+                dogProfileViewModel.confirmAlwaysPermissionRequest()
+            }
+            Button("Cancel", role: .cancel) {
+                dogProfileViewModel.locationTracker.pendingTrackingDogId = nil
+            }
+        } message: {
+            Text("Creamie needs \"Always\" location access to keep tracking your dog's location in the background. This lets other users see where your dog is even when the app isn't open.")
+        }
+        .alert("Location Permission Required", isPresented: $dogProfileViewModel.locationTracker.permissionDenied) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text(dogProfileViewModel.locationTracker.permissionDeniedMessage)
         }
     }
 }
@@ -200,6 +222,12 @@ extension DogProfilesView {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
+                    // Location tracking toggle
+                    locationTrackingToggle(for: dog)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .padding(.bottom, 12)
+                    
                     DogCard(
                         dogId: dog.id,
                         dogProfileViewModel: dogProfileViewModel,
@@ -217,6 +245,84 @@ extension DogProfilesView {
         }
         .onTapGesture {
             selectedDog = dog
+        }
+    }
+    
+    private func locationTrackingToggle(for dog: Dog) -> some View {
+        VStack(spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "location.fill")
+                            .foregroundColor(dogProfileViewModel.isLocationTrackingEnabled(for: dog.id) ? .green : .gray)
+                        
+                        Text("Real-time Location Tracking")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                    }
+                    
+                    if let status = dogProfileViewModel.getLocationTrackingStatus(for: dog.id) {
+                        trackingStatusText(status: status)
+                    } else {
+                        Text("Track \(dog.name)'s location automatically")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Toggle("", isOn: Binding(
+                    get: { dogProfileViewModel.isLocationTrackingEnabled(for: dog.id) },
+                    set: { newValue in
+                        Task {
+                            await dogProfileViewModel.toggleLocationTracking(for: dog.id, enabled: newValue)
+                        }
+                    }
+                ))
+                .labelsHidden()
+                .tint(.green)
+            }
+            .padding(16)
+            .background(Color.secondary.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+    
+    @ViewBuilder
+    private func trackingStatusText(status: TrackingStatus) -> some View {
+        switch status {
+        case .active:
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 8, height: 8)
+                Text("Tracking active")
+                    .font(.caption)
+                    .foregroundColor(.green)
+            }
+        case .paused:
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(Color.orange)
+                    .frame(width: 8, height: 8)
+                Text("Tracking paused")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+            }
+        case .stopped:
+            Text("Tracking stopped")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        case .error(let message):
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                Text("Error: \(message)")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
         }
     }
     

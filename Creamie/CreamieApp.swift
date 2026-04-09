@@ -16,10 +16,19 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var userLocation: CLLocation?
     @Published var isLocationUpdating = false
     
+    /// Control whether location updates can occur in the background
+    var allowsBackgroundLocationUpdates: Bool {
+        get { locationManager.allowsBackgroundLocationUpdates }
+        set { locationManager.allowsBackgroundLocationUpdates = newValue }
+    }
+    
     override init() {
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.allowsBackgroundLocationUpdates = false // Will be enabled when tracking starts
+        locationManager.pausesLocationUpdatesAutomatically = false
+        
         // Get initial authorization status
         authorizationStatus = locationManager.authorizationStatus
         print("LocationManager init - Authorization status: \(authorizationStatus.rawValue)")
@@ -47,6 +56,18 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
     }
     
+    func requestAlwaysAuthorization() {
+        print("📍 Requesting 'Always' location permission for background tracking...")
+        
+        if locationManager.authorizationStatus == .notDetermined {
+            // First request when in use, then always
+            locationManager.requestWhenInUseAuthorization()
+        } else if locationManager.authorizationStatus == .authorizedWhenInUse {
+            // Upgrade to always
+            locationManager.requestAlwaysAuthorization()
+        }
+    }
+    
     func startLocationUpdates() {
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             print("Cannot start location updates - not authorized")
@@ -62,6 +83,23 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         print("🛑 Stopping location updates...")
         isLocationUpdating = false
         locationManager.stopUpdatingLocation()
+    }
+    
+    func startSignificantLocationChangeMonitoring() {
+        guard authorizationStatus == .authorizedAlways else {
+            print("Cannot start significant location changes - need 'Always' authorization")
+            return
+        }
+        
+        print("🔄 Starting significant location change monitoring...")
+        locationManager.allowsBackgroundLocationUpdates = true
+        locationManager.startMonitoringSignificantLocationChanges()
+    }
+    
+    func stopSignificantLocationChangeMonitoring() {
+        print("🛑 Stopping significant location change monitoring...")
+        locationManager.stopMonitoringSignificantLocationChanges()
+        locationManager.allowsBackgroundLocationUpdates = false
     }
     
     // MARK: - CLLocationManagerDelegate
@@ -102,7 +140,7 @@ struct CreamieApp: App {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var chatViewModel = ChatViewModel()
     @StateObject private var authService = AuthenticationService.shared
-    @StateObject private var dogProfileViewModel = DogProfileViewModel()
+    @StateObject private var dogProfileViewModel = DogProfileViewModel(locationTracker: DogLocationTracker())
     
     var body: some Scene {
         WindowGroup {

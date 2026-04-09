@@ -153,5 +153,5 @@ struct ContentView: View {
     ContentView()
         .environmentObject(LocationManager())
         .environmentObject(ChatViewModel())
-        .environmentObject(DogProfileViewModel())
+        .environmentObject(DogProfileViewModel(locationTracker: DogLocationTracker()))
 }

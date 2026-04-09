@@ -27,7 +27,6 @@ struct DogLocationRequest: Codable {
     let dogId: UUID
     let latitude: Double
     let longitude: Double
-    let timestamp: Date
 }
 
 // Note: NearbyDogsRequest and NearbyDogsResponse are now defined in BackendModel.swift
@@ -69,13 +68,12 @@ class DogLocationService: ObservableObject {
         let request = DogLocationRequest(
             dogId: dogId,
             latitude: location.latitude,
-            longitude: location.longitude,
-            timestamp: Date()
+            longitude: location.longitude
         )
         
         let _: EmptyResponse = try await apiService.request(
-            endpoint: "/dogs/\(dogId.uuidString)/location",
-            method: .PUT,
+            endpoint: "/dogs/update-location",
+            method: .POST,
             body: request,
             responseType: EmptyResponse.self
         )
@@ -136,8 +134,7 @@ class DogLocationService: ObservableObject {
         let update = DogLocationRequest(
             dogId: dogId,
             latitude: location.latitude,
-            longitude: location.longitude,
-            timestamp: Date()
+            longitude: location.longitude
         )
         
         do {

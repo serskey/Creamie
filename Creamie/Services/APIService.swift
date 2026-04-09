@@ -12,8 +12,8 @@ struct APIConfig {
 
      change back to `http://127.0.0.1:9000` for local testing
      */
-//    static let baseURL = "http://127.0.0.1:9000"
-    static let baseURL = "http://127.0.0.1:9000"
+
+    static let baseURL = "https://creamiebackend-production.up.railway.app"
     static let timeout: TimeInterval = 30.0
 }
 
