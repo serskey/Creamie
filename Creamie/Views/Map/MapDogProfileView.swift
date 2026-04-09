@@ -221,7 +221,7 @@ struct DogSelectionView: View {
                         }
                     }) {
                         HStack {
-                            // TODO: Add dog avatar here
+                            // Pending Add dog avatar here
                             VStack(alignment: .leading) {
                                 Text(dog.name)
                                     .font(.headline)

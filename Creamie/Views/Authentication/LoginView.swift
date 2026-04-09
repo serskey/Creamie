@@ -71,7 +71,7 @@ struct LoginView: View {
                     HStack {
                         Spacer()
                         Button("Forgot Password?") {
-                            // TODO: Handle forgot password
+                            // Pending Handle forgot password
                         }
                         .font(.caption)
                         .foregroundColor(.purple)

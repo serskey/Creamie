@@ -246,7 +246,7 @@ struct SettingsView: View {
     }
     
     private func sendFeedback() {
-        // TODO: real email address
+        // :Pending real email address
         if let url = URL(string: "mailto:support@creamie.app?subject=Feedback") {
             UIApplication.shared.open(url)
         }

@@ -3,15 +3,6 @@ import Combine
 
 // MARK: - API Configuration
 struct APIConfig {
-    /**
-     - Get your Mac's local IP
-     ifconfig | grep "inet " | grep -v 127.0.0.1
-
-     inet 192.168.0.101 netmask 0xffffff00 broadcast 192.168.0.255  // 192.168.0.101 is for belowing baseURL
-     inet 169.254.170.133 netmask 0xffff0000 broadcast 169.254.255.255
-
-     change back to `http://127.0.0.1:9000` for local testing
-     */
 
     static let baseURL = "https://creamiebackend-production.up.railway.app"
     static let timeout: TimeInterval = 30.0
@@ -115,7 +106,7 @@ class APIService {
     // MARK: - Helper Methods
     
     private func getAuthToken() -> String? {
-        // TODO: Implement your authentication token retrieval logic
+        // Pending Implement your authentication token retrieval logic
         // For now, return nil - you can implement this based on your auth system
         return nil
     }

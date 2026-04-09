@@ -1,6 +1,6 @@
 import SwiftUI
 
-// TODO: Liquid Glass Style
+// Pending Liquid Glass Style
 struct TabBar: View {
     @Binding var selectedTab: Int
     @EnvironmentObject private var chatViewModel: ChatViewModel

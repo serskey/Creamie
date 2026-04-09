@@ -88,7 +88,7 @@ struct ChatView: View {
                 // Action Buttons - Navigation
                 HStack(spacing: 24) {
                     
-                    // TODO: Fetch Dog real location from Backend
+                    // Pending Fetch Dog real location from Backend
                     // dog location
                     CircularButton(
                         icon: "location.fill",
@@ -109,7 +109,7 @@ struct ChatView: View {
             }
             .frame(height: 56)
         }
-//        // TODO: Tap avatar to dog profile detail
+//        //Pending Tap avatar to dog profile detail
 //        .sheet(item: $selectedDog) { dog in
 //            MapDogProfileView(selectedDog: dog,
 //                              selectedTab: $selectedTab,
@@ -187,7 +187,7 @@ struct ChatView: View {
                         .focused($isTextFieldFocused)
                     
                     HStack(spacing: 16) {
-                        // TODO: Enable Mic/Emoji/Image Attanching
+                        // Pending Enable Mic/Emoji/Image Attanching
                         // Mic Icon
 //                        Button(action: {}) {
 //                            Image(systemName: "mic")

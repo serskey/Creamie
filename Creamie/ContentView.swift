@@ -110,7 +110,7 @@ struct ContentView: View {
         }
         .alert("Location Access Required", isPresented: $showingLocationAlert) {
             Button("Open Settings") {
-                // TODO: Go deeply to this specific app's location setting
+                // Pending Go deeply to this specific app's location setting
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url, options: [:], completionHandler: nil)
                 }

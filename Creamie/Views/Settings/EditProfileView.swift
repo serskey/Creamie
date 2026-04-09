@@ -35,7 +35,7 @@ struct EditProfileView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     
                     Button(action: {
-                        // TODO: Handle save
+                        // Pending Handle save
                     }) {
                         Image(systemName: "checkmark")
                     }

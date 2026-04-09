@@ -208,7 +208,7 @@ class DogProfileViewModel: ObservableObject {
             
             print("🐾 Fetched \(response.totalCount) dogs from user \(userId)")
         } catch {
-            // TODO: Add error detail from backend
+            // Pending Add error detail from backend
             print("❌ Failed to fetch user's dogs: \(error)")
             self.dogs = []
         }
@@ -280,7 +280,7 @@ class DogProfileViewModel: ObservableObject {
                         self.addDogSuccess = "\(name) has been successfully added with \(photoNames.count) photo(s)!"
                     } else {
                         print("❌ Photo upload failed (\(photoNames.count)/\(photos.count) uploaded), rolling back dog creation")
-                        // TODO: Add backend API to delete the created dog and delete uploaded photos
+                        // Pending Add backend API to delete the created dog and delete uploaded photos
                         // await DogProfileService.shared.deleteDogProfile(dogId: dogId)
                         
                         self.addDogError = "Failed to upload enough photos for \(name). At least 2 photos are required. Please try again."

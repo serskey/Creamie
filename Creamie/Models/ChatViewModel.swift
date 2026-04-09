@@ -216,7 +216,7 @@ class ChatViewModel: ObservableObject {
                         currentUserId: currentUserId,
                         otherDogId: supaChat.current_dog_id ?? supaChat.current_user_id,
                         otherDogName: supaChat.current_dog_name ?? "Other Dog",
-                        otherDogAvatar: "", // TODO: Fetch sender's dog avatar
+                        otherDogAvatar: "", // Pending Fetch sender's dog avatar
                         currentDogId: supaChat.other_dog_id,
                         currentDogName: supaChat.other_dog_name,
                         createdAt: supaChat.inserted_at,
