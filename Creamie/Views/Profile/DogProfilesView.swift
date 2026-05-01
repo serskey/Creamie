@@ -3,7 +3,7 @@ import UIKit
 
 struct DogProfilesView: View {
     // MARK: - View Models & Services
-    @StateObject private var dogProfileViewModel = DogProfileViewModel(locationTracker: DogLocationTracker())
+    @EnvironmentObject var dogProfileViewModel: DogProfileViewModel
     @StateObject private var dogHealthViewModel = DogHealthViewModel()
     @EnvironmentObject var authService: AuthenticationService
     private let locationService = DogLocationService.shared

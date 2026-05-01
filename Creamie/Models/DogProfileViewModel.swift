@@ -88,6 +88,13 @@ class DogProfileViewModel: ObservableObject {
     // Location tracking
     @Published var locationTracker: DogLocationTracker
     
+    // Per-photo upload progress (photoIndex -> progress 0.0...1.0)
+    @Published var uploadProgress: [Int: Double] = [:]
+    
+    // Fetch deduplication flags
+    private(set) var hasFetchedDogs = false
+    private var isFetching = false
+    
     private let dogProfileService = DogProfileService.shared
     
     private var photoCounter = 0
@@ -192,24 +199,31 @@ class DogProfileViewModel: ObservableObject {
         }
     }
     
-    func fetchUserDogs(userId: UUID) async {
+    func fetchUserDogs(userId: UUID, forceFetch: Bool = false) async {
+        // Skip if already fetching to prevent concurrent duplicate requests
+        guard !isFetching else { return }
+        
+        // Skip if dogs have already been fetched and no mutation has occurred
+        guard !hasFetchedDogs || forceFetch else { return }
+        
+        isFetching = true
+        defer { isFetching = false }
+        
         let getUserDogsRequest = GetUserDogsRequest(userId: userId)
         
         do {
             let response = try await dogProfileService.fetchUserDogs(getUserDogsRequest: getUserDogsRequest)
             self.dogs = response.dogs
+            self.hasFetchedDogs = true
             
-            for dog in response.dogs {
-                print("📸 Dog \(dog.name) photos:")
-                for (index, photo) in dog.photos.enumerated() {
-                    print("  Photo \(index + 1): \(photo)")
-                }
-            }
-            
+            #if DEBUG
             print("🐾 Fetched \(response.totalCount) dogs from user \(userId)")
+            #endif
         } catch {
             // Pending Add error detail from backend
+            #if DEBUG
             print("❌ Failed to fetch user's dogs: \(error)")
+            #endif
             self.dogs = []
         }
     }
@@ -276,6 +290,7 @@ class DogProfileViewModel: ObservableObject {
                         
                         dogs.append(newDog)
                         showingAddDog = false
+                        hasFetchedDogs = false
                         
                         self.addDogSuccess = "\(name) has been successfully added with \(photoNames.count) photo(s)!"
                     } else {
@@ -314,6 +329,7 @@ class DogProfileViewModel: ObservableObject {
             
             // Step2: Remove dog profile from local
             dogs.remove(at: index)
+            hasFetchedDogs = false
             print("🗑️ Deleted dog: \(dog.name)")
         }
         dogToDelete = nil
@@ -324,25 +340,145 @@ class DogProfileViewModel: ObservableObject {
         showingDeleteConfirmation = true
     }
     
-    private func uploadPhotos(_ photos: [UIImage], for dogId: UUID) async -> [String] {
-        var photoNames: [String] = []
+    // MARK: - Image Resize Helper
+    
+    /// Resizes an image so that its longest edge does not exceed `maxEdge` pixels.
+    /// Preserves the original aspect ratio. Returns the original image if no resize is needed.
+    private func resizeImageIfNeeded(_ image: UIImage, maxEdge: CGFloat = 2048) -> UIImage {
+        let width = image.size.width * image.scale
+        let height = image.size.height * image.scale
+        let longestEdge = max(width, height)
         
-        // Try to upload all photos to backend supabase storage
-        for (index, photo) in photos.enumerated() {
+        guard longestEdge > maxEdge else { return image }
+        
+        let scaleFactor = maxEdge / longestEdge
+        let newWidth = width * scaleFactor
+        let newHeight = height * scaleFactor
+        let newSize = CGSize(width: newWidth, height: newHeight)
+        
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
+    
+    /// Prepares an image for upload by resizing (if needed) and compressing to JPEG 0.7 quality.
+    private func prepareImageForUpload(_ image: UIImage) -> UIImage? {
+        let resized = resizeImageIfNeeded(image)
+        // Compress to JPEG 0.7 quality and re-create UIImage from that data
+        // so the service receives an image that produces 0.7-quality JPEG data
+        guard let jpegData = resized.jpegData(compressionQuality: 0.7) else { return nil }
+        return UIImage(data: jpegData)
+    }
+    
+    // MARK: - Upload with Retry
+    
+    /// Uploads a single photo with retry logic (up to 2 retries with exponential backoff).
+    private func uploadPhotoWithRetry(dogId: UUID, image: UIImage, index: Int) async throws -> String {
+        let maxRetries = 2
+        var lastError: Error?
+        
+        for attempt in 0...maxRetries {
             do {
-                let response = try await DogProfileService.shared.uploadDogPhoto(dogId: dogId, image: photo)
-                photoNames.append(response.imageUrl)
-                
+                let response = try await DogProfileService.shared.uploadDogPhoto(dogId: dogId, image: image)
+                return response.imageUrl
             } catch {
-                print("❌ Failed to upload photo \(index + 1): \(error)")
-                // ALL-OR-NOTHING: If any photo fails, return empty array
-                // This ensures consistent user experience - dog only appears with all intended photos
+                lastError = error
+                if attempt < maxRetries {
+                    let delay = BackoffCalculator.backoffDelay(attempt: attempt)
+                    #if DEBUG
+                    print("⚠️ Upload attempt \(attempt + 1) failed for photo \(index + 1), retrying in \(delay)s...")
+                    #endif
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                }
+            }
+        }
+        
+        throw lastError ?? APIError.networkError(
+            NSError(domain: "UploadError", code: 0,
+                    userInfo: [NSLocalizedDescriptionKey: "Upload failed after \(maxRetries + 1) attempts"])
+        )
+    }
+    
+    // MARK: - Optimized Photo Upload
+    
+    private func uploadPhotos(_ photos: [UIImage], for dogId: UUID) async -> [String] {
+        // Reset progress tracking
+        uploadProgress = [:]
+        for index in photos.indices {
+            uploadProgress[index] = 0.0
+        }
+        
+        // Prepare all images (resize + compress) before uploading
+        var preparedImages: [(index: Int, image: UIImage)] = []
+        for (index, photo) in photos.enumerated() {
+            guard let prepared = prepareImageForUpload(photo) else {
+                print("❌ Failed to prepare photo \(index + 1) for upload")
+                return []
+            }
+            preparedImages.append((index: index, image: prepared))
+        }
+        
+        // Upload up to 2 photos concurrently using TaskGroup with a concurrency limit
+        var photoNames: [String?] = Array(repeating: nil, count: photos.count)
+        var uploadFailed = false
+        
+        // Process in chunks of 2 for concurrency limiting
+        let chunkSize = 2
+        for chunkStart in stride(from: 0, to: preparedImages.count, by: chunkSize) {
+            let chunkEnd = min(chunkStart + chunkSize, preparedImages.count)
+            let chunk = Array(preparedImages[chunkStart..<chunkEnd])
+            
+            let results: [(Int, String?)] = await withTaskGroup(of: (Int, String?).self) { group in
+                for item in chunk {
+                    group.addTask { [weak self] in
+                        guard let self = self else { return (item.index, nil) }
+                        do {
+                            let url = try await self.uploadPhotoWithRetry(
+                                dogId: dogId,
+                                image: item.image,
+                                index: item.index
+                            )
+                            return (item.index, url)
+                        } catch {
+                            print("❌ Failed to upload photo \(item.index + 1) after retries: \(error)")
+                            return (item.index, nil)
+                        }
+                    }
+                }
+                
+                var collected: [(Int, String?)] = []
+                for await result in group {
+                    collected.append(result)
+                    // Update progress on main actor
+                    await MainActor.run {
+                        self.uploadProgress[result.0] = result.1 != nil ? 1.0 : 0.0
+                    }
+                }
+                return collected
+            }
+            
+            for (index, url) in results {
+                photoNames[index] = url
+                if url == nil {
+                    uploadFailed = true
+                }
+            }
+            
+            // If any upload in this chunk failed, stop processing further chunks
+            if uploadFailed {
                 return []
             }
         }
         
-        print("📤 All \(photoNames.count) photos uploaded")
-        return photoNames
+        // Verify all uploads succeeded
+        let successfulNames = photoNames.compactMap { $0 }
+        if successfulNames.count != photos.count {
+            return []
+        }
+        
+        print("📤 All \(successfulNames.count) photos uploaded")
+        return successfulNames
     }
     
     func updateDogOnlineStatus(isOnline: Bool, dogId: UUID? = nil, userId: UUID? = nil) async {
@@ -448,6 +584,7 @@ class DogProfileViewModel: ObservableObject {
                     }
                     
                     showingEditDog = false
+                    hasFetchedDogs = false
                     self.addDogSuccess = "\(name) has been successfully updated!"
                     
                 } else {

@@ -24,9 +24,6 @@ struct MessagesView: View {
                     .listRowSeparator(.hidden)
                 } else {
                     HStack(spacing: 8) {
-                        Image(systemName: "pawprint.fill")
-                            .scaleEffect(animate ? 1.5 : 1.0)
-                            .foregroundColor(.purple)
                         Text("Messages")
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundColor(.primary)
@@ -53,8 +50,13 @@ struct MessagesView: View {
             }
             .onAppear {
                 Task {
-                    await chatViewModel.fetchChatsByCurrentUserId(currentUserId: authService.currentUser!.id)
-                    await dogProfileViewModel.fetchUserDogs(userId: authService.currentUser!.id)
+                    // Only fetch if chats haven't been loaded yet (initial load is done in ContentView)
+                    if chatViewModel.chats.isEmpty {
+                        await chatViewModel.fetchChatsByCurrentUserId(currentUserId: authService.currentUser!.id)
+                    }
+                    if dogProfileViewModel.dogs.isEmpty {
+                        await dogProfileViewModel.fetchUserDogs(userId: authService.currentUser!.id)
+                    }
                     userDogs = dogProfileViewModel.dogs
                     
                     if let chatId = selectedChatId,
@@ -116,13 +118,13 @@ struct ChatRow: View {
     let chat: Chat
     let userDogs: [Dog]
     
-    private func getCurrentDogPhoto() -> String {
+    private func getCurrentDogPhoto() -> String? {
         // Find the current dog in userDogs array using currentDogId
         if let currentDogId = chat.currentDogId,
            let currentDog = userDogs.first(where: { $0.id == currentDogId }) {
-            return currentDog.photos.first ?? ""
+            return currentDog.photos.first
         }
-        return ""
+        return nil
     }
     
     var body: some View {
@@ -130,7 +132,7 @@ struct ChatRow: View {
             // Dog-to-dog conversation display
             HStack(spacing: -8) {
                 // Your dog (left, slightly behind) - using current dog's photo
-                AcatarView(photoName: getCurrentDogPhoto())
+                AcatarView(photoName: getCurrentDogPhoto() ?? "")
                     .frame(width: 35, height: 35)
                     .zIndex(0)
                 
@@ -143,13 +145,23 @@ struct ChatRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     // Show both dog names
-                    Text("\(chat.currentDogName ?? "Your Dog") & \(chat.otherDogName)")
+                    Text("\(chat.currentDogName ?? "Your Dog") 💘 \(chat.otherDogName)")
                         .font(.headline)
                         .lineLimit(1)
                     Spacer()
-                    Text(chat.lastMessageDate, style: .time)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(chat.lastMessageDate, style: .time)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        if chat.unreadCount > 0 {
+                            Text("\(chat.unreadCount)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(minWidth: 20, minHeight: 20)
+                                .background(Color.pink)
+                                .clipShape(Circle())
+                        }
+                    }
                 }
                 
                 Text(chat.lastMessageText)

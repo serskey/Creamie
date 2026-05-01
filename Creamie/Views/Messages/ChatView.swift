@@ -10,14 +10,22 @@ struct ChatView: View {
     @FocusState private var isTextFieldFocused: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var isButtonSelected = false
+    @State private var isLoadingOlderMessages = false
     
-    @State private var selectedDog: Dog?
-    
-    @EnvironmentObject var authService: AuthenticationService
+    @EnvironmentObject var dogProfileViewModel: DogProfileViewModel
     
     // Computed property to get the current chat from chatViewModel
     private var chat: Chat {
         return chatViewModel.chats.first(where: { $0.id == chatId }) ?? Chat.empty
+    }
+    
+    // Look up the current user's dog photo from the profile view model
+    private var currentDogPhoto: String? {
+        if let currentDogId = chat.currentDogId,
+           let dog = dogProfileViewModel.dogs.first(where: { $0.id == currentDogId }) {
+            return dog.photos.first
+        }
+        return nil
     }
     
     var body: some View {
@@ -34,25 +42,19 @@ struct ChatView: View {
         .background(Color(.systemBackground))
         .navigationBarHidden(true)
         .onAppear {
-            // Hide tab bar when this view appears
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showTabBar = false
+            // Track currently viewed chat and reset unread count
+            chatViewModel.currentlyViewedChatId = chatId
+            if let index = chatViewModel.chats.firstIndex(where: { $0.id == chatId }) {
+                chatViewModel.chats[index].unreadCount = 0
             }
             
             Task {
                 await chatViewModel.fetchMessagesByChatId(for: chatId)
             }
-            
-            Task {
-                // Subscribe to messages for this chat
-                await chatViewModel.subscribeToMessages(for: chatId)
-            }
         }
         .onDisappear {
-            // Show tab bar when this view disappears (going back)
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showTabBar = true
-            }
+            // Clear currently viewed chat
+            chatViewModel.currentlyViewedChatId = nil
         }
     }
     
@@ -109,14 +111,6 @@ struct ChatView: View {
             }
             .frame(height: 56)
         }
-//        //Pending Tap avatar to dog profile detail
-//        .sheet(item: $selectedDog) { dog in
-//            MapDogProfileView(selectedDog: dog,
-//                              selectedTab: $selectedTab,
-//                              selectedChatId: $selectedChatId)
-//            .presentationDetents([.medium])
-//            .presentationBackgroundInteraction(.enabled)
-//        }
     }
     
     // MARK: - Chat Messages
@@ -124,6 +118,21 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: 4) {
+                    // Scroll-to-top pagination trigger: loads older messages
+                    // when the user scrolls to the top of the conversation.
+                    Color.clear
+                        .frame(height: 1)
+                        .id("topSentinel")
+                        .onAppear {
+                            guard !isLoadingOlderMessages,
+                                  !chat.safeMessages.isEmpty else { return }
+                            isLoadingOlderMessages = true
+                            Task {
+                                await chatViewModel.loadOlderMessages(for: chatId)
+                                isLoadingOlderMessages = false
+                            }
+                        }
+
                     ForEach(Array(chat.safeMessages.enumerated()), id: \.element.id) { index, message in
                         let isFromCurrentUser = message.isFromCurrentUser
                         let isFirst = index == 0 || chat.safeMessages[index - 1].isFromCurrentUser != isFromCurrentUser
@@ -150,7 +159,7 @@ struct ChatView: View {
                                                     isFirstInGroup: isFirst,
                                                     isLastInGroup: isLast)
                                 
-                                AcatarView(photoName: selectedDog?.photos.first ?? "https://bibnhxcfmdpwqcfftgtj.supabase.co/storage/v1/object/public/dog-photos/2867871c-2449-445a-bebb-2cdb7525ab99_bd256857-4f3e-4152-8348-0fd4330dea24.jpg")
+                                AcatarView(photoName: currentDogPhoto ?? "")
                                     .frame(width: 40, height: 40)
                                     .scaleEffect(0.7)
                                     .zIndex(1)

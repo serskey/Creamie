@@ -67,6 +67,24 @@ struct QueuedLocationUpdate: Codable {
     }
 }
 
+/// Coalesce queued location updates to keep only the most recent update per dog ID.
+/// This reduces redundant network requests when connectivity is restored after an offline period.
+func coalesceQueuedUpdates(_ updates: [QueuedLocationUpdate]) -> [QueuedLocationUpdate] {
+    var mostRecentByDog: [UUID: QueuedLocationUpdate] = [:]
+    
+    for update in updates {
+        if let existing = mostRecentByDog[update.dogId] {
+            if update.timestamp > existing.timestamp {
+                mostRecentByDog[update.dogId] = update
+            }
+        } else {
+            mostRecentByDog[update.dogId] = update
+        }
+    }
+    
+    return Array(mostRecentByDog.values)
+}
+
 /// Main service for tracking dog locations
 @MainActor
 class DogLocationTracker: NSObject, ObservableObject {
@@ -419,26 +437,33 @@ class DogLocationTracker: NSObject, ObservableObject {
         isProcessingQueue = true
         networkLogger.info("Processing \(self.offlineQueue.count, privacy: .public) queued location updates")
         
-        var successfulUpdates: [QueuedLocationUpdate] = []
+        // Coalesce updates: keep only the most recent update per dog ID
+        let coalescedUpdates = coalesceQueuedUpdates(offlineQueue)
+        networkLogger.info("Coalesced \(self.offlineQueue.count, privacy: .public) updates to \(coalescedUpdates.count, privacy: .public) (one per dog)")
         
-        for queuedUpdate in offlineQueue {
+        var successfulDogIds: Set<UUID> = []
+        
+        for queuedUpdate in coalescedUpdates {
             do {
                 try await DogLocationService.shared.updateDogLocation(
                     dogId: queuedUpdate.dogId,
                     location: queuedUpdate.location.coordinate
                 )
-                successfulUpdates.append(queuedUpdate)
+                successfulDogIds.insert(queuedUpdate.dogId)
                 networkLogger.info("Sent queued update for dog \(queuedUpdate.dogId.uuidString, privacy: .public)")
             } catch {
                 networkLogger.error("Failed to send queued update for dog \(queuedUpdate.dogId.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                // Keep failed updates in queue for next attempt
+                // Keep the most recent update for failed dogs in queue for next attempt
             }
         }
         
-        // Remove successful updates from queue
+        // Remove all updates for successfully sent dogs (all older updates are now irrelevant)
         offlineQueue.removeAll { update in
-            successfulUpdates.contains { $0.dogId == update.dogId && $0.timestamp == update.timestamp }
+            successfulDogIds.contains(update.dogId)
         }
+        
+        // For dogs that failed, coalesce remaining queue entries to keep only the most recent
+        offlineQueue = coalesceQueuedUpdates(offlineQueue)
         
         saveOfflineQueue()
         isProcessingQueue = false

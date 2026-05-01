@@ -135,6 +135,25 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
 }
 
+struct UnsupportedDeviceView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "iphone.slash")
+                .font(.system(size: 60))
+                .foregroundColor(.gray)
+            
+            Text("Device Not Supported")
+                .font(.title)
+                .bold()
+            
+            Text("Creamie requires iPhone 16 or above with iOS 26 to experience Liquid Glass effects.")
+                .multilineTextAlignment(.center)
+                .foregroundColor(.gray)
+                .padding(.horizontal)
+        }
+    }
+}
+
 @main
 struct CreamieApp: App {
     @StateObject private var locationManager = LocationManager()
@@ -142,16 +161,30 @@ struct CreamieApp: App {
     @StateObject private var authService = AuthenticationService.shared
     @StateObject private var dogProfileViewModel = DogProfileViewModel(locationTracker: DogLocationTracker())
     
+    func isDeviceSupported() -> Bool {
+        // Get screen size
+        let screenHeight = UIScreen.main.nativeBounds.height
+        
+        // iPhone SE (all generations) have screen height of 1334 or less
+        if screenHeight <= 1334 {
+            return false // iPhone SE
+        }
+        return true
+    }
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(locationManager)
-                .environmentObject(chatViewModel)
-                .environmentObject(authService)
-                .environmentObject(dogProfileViewModel)
-                .task {
-                    await supabase.realtimeV2.connect()
-                }
+            if !isDeviceSupported() {
+               UnsupportedDeviceView()
+           } else if #available(iOS 26.0, *) {
+               ContentView()
+                   .environmentObject(locationManager)
+                   .environmentObject(chatViewModel)
+                   .environmentObject(authService)
+                   .environmentObject(dogProfileViewModel)
+           } else {
+               UnsupportedDeviceView()
+           }
         }
     }
 }

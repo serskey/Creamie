@@ -10,8 +10,6 @@ import CoreLocation
 
 struct ContentView: View {
     @State private var selectedTab = 0
-    @State private var mapViewId = UUID()
-    @State private var dogProfileViewId = UUID()
     @State private var selectedChatId: UUID?
     @State private var isLoading = true
     @EnvironmentObject private var locationManager: LocationManager
@@ -41,18 +39,16 @@ struct ContentView: View {
                 mainContent
                     .onAppear {
                         print("🔄 Showing mainContent - authenticated!")
+                        // Defer non-critical initialization until after main content appears
+                        deferredInitialization()
                     }
             }
         }
-        .onAppear {
-            startInitialLoadingSequence()
+        .task {
+            await concurrentStartupSequence()
         }
         .onChange(of: authService.isAuthenticated) { oldValue, newValue in
             print("🔄 ContentView: Authentication changed from \(oldValue) to \(newValue)")
-            // When user successfully authenticates, request location permission
-            if newValue && !oldValue {
-                locationManager.requestPermission()
-            }
         }
     }
     
@@ -65,10 +61,8 @@ struct ContentView: View {
                     MapView(selectedTab: $selectedTab,
                             selectedChatId: $selectedChatId)
                     .environmentObject(dogProfileViewModel)
-                    .id(mapViewId)
                 case 1:
                     DogProfilesView()
-                        .id(dogProfileViewId)
                 case 2:
                     MessagesView(
                         chatViewModel: chatViewModel,
@@ -78,10 +72,7 @@ struct ContentView: View {
                     SettingsView()
                         .environmentObject(authService)
                 default:
-                    MapView(selectedTab: $selectedTab,
-                            selectedChatId: $selectedChatId)
-                    .environmentObject(dogProfileViewModel)
-                    .id(mapViewId)
+                    EmptyView()
                 }
             }
             
@@ -93,20 +84,8 @@ struct ContentView: View {
                 }
             }
         }
-        .onAppear {
-            checkLocationPermission()
-        }
         .onChange(of: locationManager.authorizationStatus) {
             checkLocationPermission()
-        }
-        .onChange(of: selectedTab) { oldValue, newValue in
-            // When switching to map tab (0), create a new ID to force refresh
-            if newValue == 0 {
-                // Small delay to ensure smooth transition
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    mapViewId = UUID()
-                }
-            }
         }
         .alert("Location Access Required", isPresented: $showingLocationAlert) {
             Button("Open Settings") {
@@ -129,22 +108,75 @@ struct ContentView: View {
         }
     }
     
+    // MARK: - Concurrent Startup Sequence
+    
+    /// Runs auth state loading and Supabase real-time connection concurrently
+    /// during the splash screen. Once auth resolves, prefetches dog profiles
+    /// and chat list in parallel. Transitions to main content when both auth
+    /// is resolved and the minimum 2-second splash duration has elapsed.
+    private func concurrentStartupSequence() async {
+        let splashStart = Date()
+        let minimumSplashDuration: TimeInterval = 2.0
+        
+        // Phase 1: Run auth state loading and Supabase connection concurrently
+        await withTaskGroup(of: Void.self) { group in
+            // Auth state is already loaded synchronously in AuthenticationService.init(),
+            // but we ensure the Supabase real-time connection starts in parallel
+            group.addTask {
+                await supabase.realtimeV2.connect()
+            }
+            
+            // Wait for both to complete
+            await group.waitForAll()
+        }
+        
+        // Phase 2: If authenticated, prefetch dog profiles and chat list concurrently
+        if authService.isAuthenticated, let userId = authService.currentUser?.id {
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    await dogProfileViewModel.fetchUserDogs(userId: userId)
+                }
+                group.addTask {
+                    await chatViewModel.fetchChatsByCurrentUserId(currentUserId: userId)
+                }
+                await group.waitForAll()
+            }
+        }
+        
+        // Phase 3: Ensure minimum splash duration has elapsed before transitioning
+        let elapsed = Date().timeIntervalSince(splashStart)
+        if elapsed < minimumSplashDuration {
+            let remaining = minimumSplashDuration - elapsed
+            try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+        }
+        
+        // Transition to main content
+        withAnimation(.easeInOut(duration: 0.5)) {
+            isLoading = false
+        }
+    }
+    
+    // MARK: - Deferred Initialization
+    
+    /// Defers non-critical initialization until after the main content is displayed.
+    /// This includes location permission requests and tracking preference loading.
+    private func deferredInitialization() {
+        // Request location permission after main content appears
+        if authService.isAuthenticated {
+            locationManager.requestPermission()
+        }
+        checkLocationPermission()
+        
+        // Load tracking preferences after main content appears
+        dogProfileViewModel.loadTrackingPreferences()
+    }
+    
     private func checkLocationPermission() {
         switch locationManager.authorizationStatus {
         case .denied, .restricted:
             showingLocationAlert = true
         default:
             showingLocationAlert = false
-        }
-    }
-    
-    private func startInitialLoadingSequence() {
-        
-        // Minimum splash duration of 2.0 seconds for nice UX
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            withAnimation(.easeInOut(duration: 0.5)) {
-                isLoading = false
-            }
         }
     }
 }

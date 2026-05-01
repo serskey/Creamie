@@ -5,13 +5,12 @@
 //  Created by Siqi Xu on 7/6/25.
 //
 
-import Testing
-@testable import Creamie
+import XCTest
 
-struct CreamieTests {
+final class CreamieTests: XCTestCase {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    func testExample() async throws {
+        // Write your test here and use APIs like `XCTAssert(...)` to check expected conditions.
     }
 
 }

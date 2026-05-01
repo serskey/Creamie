@@ -17,6 +17,7 @@ class MapViewModel: ObservableObject {
     private var fetchTimer: Timer?
     private var searchTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
+    private var currentFetchTask: Task<Void, Never>?
     
     private(set) var isInitialLoad = true
     
@@ -48,22 +49,27 @@ class MapViewModel: ObservableObject {
         guard let region = getCurrentVisibleRegion(),
               shouldFetchForRegion(region) else { return }
         
+        // Cancel any in-flight fetch before issuing a new one (Requirement 3.3)
+        currentFetchTask?.cancel()
+        
         let boundingBox = createBoundingBox(from: region)
         
-        Task {
+        currentFetchTask = Task {
             do {
                 let response = try await locationService.fetchNearbyDogs(request: boundingBox)
                 
-                await MainActor.run {
-                    self.nearbyDogs = response.dogs
-                    self.lastFetchedRegion = region
-                    self.isInitialLoad = false
-                }
+                // Bail out if this task was cancelled while the fetch was in progress
+                guard !Task.isCancelled else { return }
+                
+                self.nearbyDogs = response.dogs
+                self.lastFetchedRegion = region
+                self.isInitialLoad = false
+            } catch is CancellationError {
+                // Task was cancelled — silently discard the result
             } catch {
-                await MainActor.run {
-                    print("Failed to fetch dogs: \(error)")
-                    self.nearbyDogs = []
-                }
+                guard !Task.isCancelled else { return }
+                print("Failed to fetch dogs: \(error)")
+                self.nearbyDogs = []
             }
         }
     }
@@ -97,24 +103,17 @@ class MapViewModel: ObservableObject {
     /// Search dogs by specific breed
     func searchDogsByBreed(_ breed: DogBreed) {
         Task {
-            await MainActor.run {
-                self.isSearching = true
-                self.searchError = nil
-            }
+            self.isSearching = true
+            self.searchError = nil
             
             do {
                 let dogs = try await dogProfileService.getDogsByBreed(breed)
-                
-                await MainActor.run {
-                    self.searchResults = dogs
-                    self.isSearching = false
-                }
+                self.searchResults = dogs
+                self.isSearching = false
             } catch {
-                await MainActor.run {
-                    self.searchError = "Failed to search by breed: \(error.localizedDescription)"
-                    self.searchResults = []
-                    self.isSearching = false
-                }
+                self.searchError = "Failed to search by breed: \(error.localizedDescription)"
+                self.searchResults = []
+                self.isSearching = false
             }
         }
     }
@@ -122,26 +121,19 @@ class MapViewModel: ObservableObject {
     /// Search nearby dogs within a specific radius
     func searchNearbyDogs(location: CLLocation, radius: Double = Constants.defaultSearchRadius) {
         Task {
-            await MainActor.run {
-                self.isSearching = true
-                self.searchError = nil
-            }
+            self.isSearching = true
+            self.searchError = nil
             
             do {
                 let locationStruct = Location(latitude: location.coordinate.latitude,
                                            longitude: location.coordinate.longitude)
                 let dogs = try await dogProfileService.getNearbyDogs(location: locationStruct, radius: radius)
-                
-                await MainActor.run {
-                    self.searchResults = dogs
-                    self.isSearching = false
-                }
+                self.searchResults = dogs
+                self.isSearching = false
             } catch {
-                await MainActor.run {
-                    self.searchError = "Failed to search nearby dogs: \(error.localizedDescription)"
-                    self.searchResults = []
-                    self.isSearching = false
-                }
+                self.searchError = "Failed to search nearby dogs: \(error.localizedDescription)"
+                self.searchResults = []
+                self.isSearching = false
             }
         }
     }
@@ -215,6 +207,7 @@ class MapViewModel: ObservableObject {
     }
     
     deinit {
+        currentFetchTask?.cancel()
         fetchTimer?.invalidate()
         searchTimer?.invalidate()
         cancellables.removeAll()
@@ -257,10 +250,8 @@ private extension MapViewModel {
     }
     
     func performSearch(query: String, userLocation: CLLocation?) async {
-        await MainActor.run {
-            self.isSearching = true
-            self.searchError = nil
-        }
+        self.isSearching = true
+        self.searchError = nil
         
         do {
             // Determine if query is likely a breed or a name
@@ -284,16 +275,12 @@ private extension MapViewModel {
                 radius: Constants.defaultSearchRadius
             )
             
-            await MainActor.run {
-                self.searchResults = dogs
-                self.isSearching = false
-            }
+            self.searchResults = dogs
+            self.isSearching = false
         } catch {
-            await MainActor.run {
-                self.searchError = "Search failed: \(error.localizedDescription)"
-                self.searchResults = []
-                self.isSearching = false
-            }
+            self.searchError = "Search failed: \(error.localizedDescription)"
+            self.searchResults = []
+            self.isSearching = false
         }
     }
 }

@@ -107,7 +107,7 @@ private extension MapView {
                 }
             }
             
-            // Dog markers
+            // Dog markers — always show the cute custom DogMarker for every dog
             ForEach(filteredDogs) { dog in
                 Annotation(dog.name, coordinate: CLLocationCoordinate2D(latitude: dog.latitude, longitude: dog.longitude)) {
                     DogMarker(dog: dog)
@@ -121,7 +121,7 @@ private extension MapView {
                 pointsOfInterest: .excludingAll)
         )
         .mapControlVisibility(.hidden)
-        .onMapCameraChange { context in
+        .onMapCameraChange(frequency: .onEnd) { context in
             handleCameraChange(context)
         }
         .gesture(mapInteractionGesture)
@@ -286,11 +286,9 @@ private extension MapView {
                 let userCoordinate = userLocation.coordinate
                 let currentCenter = context.region.center
                 
-                // Calculate distance between current center and user location
                 let distance = CLLocation(latitude: currentCenter.latitude, longitude: currentCenter.longitude)
                     .distance(from: CLLocation(latitude: userCoordinate.latitude, longitude: userCoordinate.longitude))
                 
-                // If moved more than 100 meters away, stop tracking
                 if distance > 100 {
                     isTrackingUserLocation = false
                 }
@@ -314,11 +312,6 @@ private extension MapView {
         }
         
         viewModel.fetchNearbyDogs()
-        
-//        // clear sermatic search when back to my location
-//        if isSearchActive {
-//            clearSearch()
-//        }
     }
     
     func handleSearchTextChange(_ newValue: String) {

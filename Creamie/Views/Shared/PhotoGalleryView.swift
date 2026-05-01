@@ -44,84 +44,131 @@ struct PhotoGalleryView: View {
 
 struct DogPhotoView: View {
     let photoName: String
+    @State private var cachedImage: UIImage?
+    @State private var loadState: LoadState = .idle
+    
+    private enum LoadState {
+        case idle, loading, loaded, failed
+    }
     
     var body: some View {
         GeometryReader { geometry in
-            
-            // Check if photoName is a Supabase backend URL
-            if photoName.hasPrefix("https://") && photoName.contains("supabase.co") {
-                // Load from backend URL using AsyncImage
-                AsyncImage(url: URL(string: photoName)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                            .clipped()
-                    case .failure(_):
-                        // Error loading from backend
-                        ZStack {
-                            Color.red.opacity(0.1)
-                            Image(systemName: "exclamationmark.triangle")
-                                .foregroundColor(.red)
-                                .font(.largeTitle)
-                        }
-                    case .empty:
-                        // Loading placeholder
-                        ZStack {
-                            Color.gray.opacity(0.1)
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                                .scaleEffect(0.8)
-                        }
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
-                .onAppear {
-                    print("📸 Loading backend photo: \(photoName)")
-                }
-            } else if let uiImage = UIImage(named: photoName) {
-                // Load from asset catalog (for sample dogs like "dog_Max")
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
-                .onAppear {
-                    print("📸 Loading asset photo: \(photoName)")
-                }
-            } else {
-                // Fallback placeholder
-                ZStack {
-                    Color.clear
-                    Image(systemName: "photo")
+            Group {
+                if let image = cachedImage {
+                    Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
-                        .font(.largeTitle)
-                        .foregroundColor(.gray.opacity(0.6))
-                }
-                .onAppear {
-                    print("📸 Fallback placeholder for: \(photoName)")
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                } else if loadState == .failed {
+                    ZStack {
+                        Color.red.opacity(0.1)
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundColor(.red)
+                            .font(.largeTitle)
+                    }
+                } else if loadState == .loading {
+                    ZStack {
+                        Color.gray.opacity(0.1)
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(0.8)
+                    }
+                } else {
+                    Color.clear
                 }
             }
+            .task(id: photoName) {
+                await loadImage(targetSize: geometry.size)
+            }
+        }
+        .onDisappear {
+            Task { await ImagePipeline.shared.cancelDownload(for: photoName) }
+        }
+    }
+    
+    private func loadImage(targetSize: CGSize) async {
+        // Check if it's a local asset
+        if !photoName.hasPrefix("https://") {
+            if let uiImage = UIImage(named: photoName) {
+                cachedImage = uiImage
+                loadState = .loaded
+            } else {
+                loadState = .failed
+            }
+            return
+        }
+        
+        // Download and downsample via ImagePipeline
+        loadState = .loading
+        
+        do {
+            let image = try await ImagePipeline.shared.image(for: photoName, targetSize: targetSize)
+            cachedImage = image
+            loadState = .loaded
+        } catch {
+            loadState = .failed
         }
     }
 }
 
 struct AcatarView: View {
     let photoName: String
+    @State private var cachedImage: UIImage?
+    @State private var loadFailed = false
+    
+    /// AcatarView displays at 50×50 points; request 50pt thumbnail
+    /// (ImagePipeline multiplies by scale internally for 150×150 pixels at 3x).
+    private let thumbnailSize = CGSize(width: 50, height: 50)
     
     var body: some View {
-        AsyncImage(url: URL(string: photoName)) { image in
-            image
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .clipShape(Circle())
-                .frame(width: 50, height: 50)
-        } placeholder: {
-            ProgressView()
+        Group {
+            if let image = cachedImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .clipShape(Circle())
+                    .frame(width: 50, height: 50)
+            } else if loadFailed {
+                Image(systemName: "pawprint.circle.fill")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .clipShape(Circle())
+                    .frame(width: 50, height: 50)
+                    .foregroundColor(.gray)
+            } else {
+                ProgressView()
+                    .frame(width: 50, height: 50)
+            }
+        }
+        .task(id: photoName) {
+            cachedImage = nil
+            loadFailed = false
+            
+            guard !photoName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                loadFailed = true
+                return
+            }
+            
+            guard photoName.hasPrefix("https://") else {
+                // Local asset or invalid — no pipeline needed
+                if let uiImage = UIImage(named: photoName) {
+                    cachedImage = uiImage
+                } else {
+                    loadFailed = true
+                }
+                return
+            }
+            
+            do {
+                let image = try await ImagePipeline.shared.image(for: photoName, targetSize: thumbnailSize)
+                cachedImage = image
+            } catch {
+                loadFailed = true
+            }
+        }
+        .onDisappear {
+            Task { await ImagePipeline.shared.cancelDownload(for: photoName) }
         }
     }
 }

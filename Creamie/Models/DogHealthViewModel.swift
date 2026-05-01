@@ -127,6 +127,12 @@ struct GroomingAppointment: Identifiable, Codable {
     }
 }
 
+// MARK: - Health Data Cache
+struct CachedHealthData {
+    let response: GetDogHealthResponse
+    let fetchedAt: Date
+}
+
 // MARK: - Updated DogHealthViewModel
 @MainActor
 class DogHealthViewModel: ObservableObject {
@@ -144,11 +150,27 @@ class DogHealthViewModel: ObservableObject {
     @Published var saveHealthError: String?
     
     private var currentDogId: UUID?
+    private var healthDataCache: [UUID: CachedHealthData] = [:]
+    private var saveDebounceTask: Task<Void, Never>?
     
     // MARK: - Load Health Data
     func loadHealthData(for dogId: UUID) async {
-        isLoading = true
         currentDogId = dogId
+        
+        // Return cached data if available for this dog within the session
+        if let cached = healthDataCache[dogId] {
+            let response = cached.response
+            self.vaccinations = response.vaccinationRecords ?? []
+            self.vetAppointments = response.vetAppointments ?? []
+            self.weightHistory = response.weightHistory ?? []
+            self.medications = response.medications ?? []
+            self.groomingAppointments = response.groomingAppointments ?? []
+            self.getDogHealthError = nil
+            print("📋 Returning cached health data for dog \(dogId)")
+            return
+        }
+        
+        isLoading = true
         defer { isLoading = false }
         
         do {
@@ -171,6 +193,9 @@ class DogHealthViewModel: ObservableObject {
             self.weightHistory = response.weightHistory ?? []
             self.medications = response.medications ?? []
             self.groomingAppointments = response.groomingAppointments ?? []
+            
+            // Cache the response for this dog
+            self.healthDataCache[dogId] = CachedHealthData(response: response, fetchedAt: Date())
             
             // Clear any previous errors
             self.getDogHealthError = nil
@@ -205,6 +230,8 @@ class DogHealthViewModel: ObservableObject {
             
             if response.status == "success" {
                 saveHealthError = nil
+                // Invalidate cache for this dog since data has changed
+                healthDataCache.removeValue(forKey: dogId)
                 print("✅ Successfully saved health data for dog \(dogId)")
             } else {
                 saveHealthError = response.error ?? "Failed to save health data"
@@ -216,41 +243,46 @@ class DogHealthViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Debounced Save
+    /// Schedules a debounced save. Cancels any pending save and waits 500ms before calling saveAllHealthData().
+    /// Rapid sequential additions are batched into a single save call.
+    private func scheduleDebouncedSave() {
+        saveDebounceTask?.cancel()
+        saveDebounceTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            } catch {
+                return // Task was cancelled, a newer save is pending
+            }
+            await self?.saveAllHealthData()
+        }
+    }
+    
     // MARK: - Individual Data Management Methods
     func addVaccination(_ vaccination: VaccinationRecord) {
         vaccinations.append(vaccination)
-        Task {
-            await saveAllHealthData()
-        }
+        scheduleDebouncedSave()
     }
     
     func addVetAppointment(_ appointment: VetAppointment) {
         vetAppointments.append(appointment)
-        Task {
-            await saveAllHealthData()
-        }
+        scheduleDebouncedSave()
     }
     
     func addWeightRecord(_ record: WeightRecord) {
         weightHistory.append(record)
         weightHistory.sort { $0.measurementDate < $1.measurementDate }
-        Task {
-            await saveAllHealthData()
-        }
+        scheduleDebouncedSave()
     }
     
     func addMedication(_ medication: Medication) {
         medications.append(medication)
-        Task {
-            await saveAllHealthData()
-        }
+        scheduleDebouncedSave()
     }
     
     func addGroomingAppointment(_ appointment: GroomingAppointment) {
         groomingAppointments.append(appointment)
-        Task {
-            await saveAllHealthData()
-        }
+        scheduleDebouncedSave()
     }
     
     // MARK: - Bulk Add Methods (for form submissions)
@@ -339,6 +371,7 @@ class DogHealthViewModel: ObservableObject {
         weightHistory.removeAll()
         medications.removeAll()
         groomingAppointments.removeAll()
+        healthDataCache.removeAll()
         currentDogId = nil
         getDogHealthError = nil
         saveHealthError = nil
